@@ -53,6 +53,7 @@ export interface ReviewRepository {
       'id' | 'createdAt' | 'likes' | 'comments' | 'isLikedByMe'
     >
   ): Promise<Review>
+  deleteReview(reviewId: string, userId: string): Promise<void>
   toggleLike(reviewId: string, userId: string): Promise<boolean>
   addComment(
     reviewId: string,

@@ -2,6 +2,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { db } from '../../data/repositoryProvider'
 import {
   type CustomList,
+  type Review,
+  type Story,
   type RestaurantDuel,
   RestaurantCategory,
   IllnessSymptom,
@@ -15,6 +17,7 @@ export function useSessionUser() {
   return useQuery({
     queryKey: ['sessionUser'],
     queryFn: () => db.session.getCurrentUser(),
+    staleTime: 60 * 1000,
   })
 }
 
@@ -106,6 +109,7 @@ export function useRestaurants(city?: string) {
       city
         ? db.restaurants.getRestaurantsByCity(city)
         : db.restaurants.getRestaurants(),
+    staleTime: 5 * 60 * 1000,
   })
 }
 
@@ -120,8 +124,9 @@ export function useRestaurant(id: string) {
 export function useUpdateRestaurant() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (restaurant: Parameters<typeof db.restaurants.updateRestaurant>[0]) =>
-      db.restaurants.updateRestaurant(restaurant),
+    mutationFn: (
+      restaurant: Parameters<typeof db.restaurants.updateRestaurant>[0]
+    ) => db.restaurants.updateRestaurant(restaurant),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['restaurants'] })
       queryClient.invalidateQueries({ queryKey: ['restaurants', data.id] })
@@ -137,14 +142,21 @@ export function useReviews(filter?: {
   restaurantId?: string
   userId?: string
 }) {
+  const queryKey = filter?.restaurantId
+    ? ['reviews', 'restaurant', filter.restaurantId]
+    : filter?.userId
+      ? ['reviews', 'user', filter.userId]
+      : ['reviews', 'all']
+
   return useQuery({
-    queryKey: ['reviews', filter],
+    queryKey,
     queryFn: () => {
       if (filter?.restaurantId)
         return db.reviews.getReviewsByRestaurant(filter.restaurantId)
       if (filter?.userId) return db.reviews.getReviewsByUser(filter.userId)
       return db.reviews.getReviews()
     },
+    staleTime: 30 * 1000,
   })
 }
 
@@ -159,6 +171,38 @@ export function usePostReview() {
         queryKey: ['restaurants', data.restaurantId],
       })
       queryClient.invalidateQueries({ queryKey: ['users', data.userId] })
+    },
+  })
+}
+
+export function useDeleteReview() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ reviewId, userId }: { reviewId: string; userId: string }) =>
+      db.reviews.deleteReview(reviewId, userId),
+    onMutate: async ({ reviewId }) => {
+      await queryClient.cancelQueries({ queryKey: ['reviews'] })
+      const previous = queryClient.getQueriesData<Review[]>({
+        queryKey: ['reviews'],
+      })
+
+      queryClient.setQueriesData<Review[]>(
+        { queryKey: ['reviews'] },
+        (reviews) => reviews?.filter((review) => review.id !== reviewId)
+      )
+
+      return { previous }
+    },
+    onError: (_error, _variables, context) => {
+      context?.previous.forEach(([queryKey, reviews]) => {
+        queryClient.setQueryData(queryKey, reviews)
+      })
+    },
+    onSuccess: (_, { reviewId }) => {
+      queryClient.removeQueries({ queryKey: ['reviews', { id: reviewId }] })
+      queryClient.invalidateQueries({ queryKey: ['restaurants'] })
+      queryClient.invalidateQueries({ queryKey: ['users'] })
+      queryClient.invalidateQueries({ queryKey: ['sessionUser'] })
     },
   })
 }
@@ -233,6 +277,7 @@ export function useGroups() {
   return useQuery({
     queryKey: ['groups'],
     queryFn: () => db.groups.getGroups(),
+    staleTime: 2 * 60 * 1000,
   })
 }
 
@@ -399,6 +444,7 @@ export function useStories() {
   return useQuery({
     queryKey: ['stories'],
     queryFn: () => db.stories.getStories(),
+    staleTime: 15 * 1000,
   })
 }
 
@@ -427,8 +473,24 @@ export function useMarkStoryViewed() {
   return useMutation({
     mutationFn: ({ storyId, userId }: { storyId: string; userId: string }) =>
       db.stories.markStoryAsViewed(storyId, userId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['stories'] })
+    onMutate: async ({ storyId, userId }) => {
+      await queryClient.cancelQueries({ queryKey: ['stories'] })
+      const previous = queryClient.getQueryData<Story[]>(['stories'])
+
+      queryClient.setQueryData<Story[]>(['stories'], (stories) =>
+        stories?.map((story) =>
+          story.id === storyId && !story.viewers.includes(userId)
+            ? { ...story, viewers: [...story.viewers, userId] }
+            : story
+        )
+      )
+
+      return { previous }
+    },
+    onError: (_error, _variables, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['stories'], context.previous)
+      }
     },
   })
 }
@@ -472,7 +534,9 @@ export function usePostIllnessReport() {
       queryClient.invalidateQueries({
         queryKey: ['illnessReports', restaurantId],
       })
-      queryClient.invalidateQueries({ queryKey: ['illnessLimit', restaurantId] })
+      queryClient.invalidateQueries({
+        queryKey: ['illnessLimit', restaurantId],
+      })
       queryClient.invalidateQueries({ queryKey: ['restaurants', restaurantId] })
     },
   })

@@ -27,7 +27,6 @@ export function StoriesScreen() {
   const { mutate: markStoryViewed } = useMarkStoryViewed()
 
   const [currentIndex, setCurrentIndex] = useState(0)
-  const [progress, setProgress] = useState(0)
   // Open straight into the composer when arriving via the "Postar" button.
   const [isCreating, setIsCreating] = useState(
     () => searchParams.get('compose') === '1'
@@ -37,28 +36,6 @@ export function StoriesScreen() {
   const [isViewersOpen, setIsViewersOpen] = useState(false)
   // null until the user actually captures/picks a photo — no fake placeholder.
   const [imageUrl, setImageUrl] = useState<string | null>(null)
-
-  // Story autoplay interval
-  useEffect(() => {
-    if (isCreating || !stories || stories.length === 0) return
-
-    const interval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          if (currentIndex < stories.length - 1) {
-            setCurrentIndex((idx) => idx + 1)
-            return 0
-          } else {
-            navigate('/')
-            return 100
-          }
-        }
-        return prev + 1
-      })
-    }, 40) // ~4 seconds total per story
-
-    return () => clearInterval(interval)
-  }, [currentIndex, stories, isCreating, navigate])
 
   // Mark the visible story as viewed (skip my own; idempotent in the repo).
   useEffect(() => {
@@ -73,7 +50,6 @@ export function StoriesScreen() {
     if (!stories) return
     if (currentIndex < stories.length - 1) {
       setCurrentIndex(currentIndex + 1)
-      setProgress(0)
     } else {
       navigate('/')
     }
@@ -82,7 +58,6 @@ export function StoriesScreen() {
   const handlePrev = () => {
     if (currentIndex > 0) {
       setCurrentIndex(currentIndex - 1)
-      setProgress(0)
     }
   }
 
@@ -131,76 +106,91 @@ export function StoriesScreen() {
       setTaggedRestaurantId('')
       setImageUrl(null)
       setCurrentIndex(0)
-      setProgress(0)
     } catch {
       toast('Falha ao postar story', 'error')
     }
   }
 
   if (isLoading) {
-    return <div className="text-center py-10 text-xs text-[#808080]">Carregando stories…</div>
+    return (
+      <div className="py-10 text-center text-xs text-[#808080]">
+        Carregando stories…
+      </div>
+    )
   }
 
   if (isCreating) {
     return (
-      <div className="space-y-6 max-w-md mx-auto pb-10">
-        <div className="flex justify-between items-center">
-          <h1 className="text-xl font-extrabold text-white flex items-center gap-1.5">
+      <div className="mx-auto max-w-md space-y-6 pb-10">
+        <div className="flex items-center justify-between">
+          <h1 className="flex items-center gap-1.5 text-xl font-extrabold text-white">
             <Camera className="text-primary" /> Novo Story
           </h1>
-          <button onClick={closeComposer} className="text-white hover:opacity-85">
+          <button
+            onClick={closeComposer}
+            className="text-white hover:opacity-85"
+          >
             <X size={20} />
           </button>
         </div>
 
-        <Card className="border-[#2D2D2D] bg-[#1A1A1A] p-4 space-y-4">
+        <Card className="space-y-4 border-[#2D2D2D] bg-[#1A1A1A] p-4">
           {imageUrl ? (
-            <div className="h-72 rounded-xl bg-[#242424] border border-[#2D2D2D] relative overflow-hidden flex items-center justify-center">
-              <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" />
+            <div className="relative flex h-72 items-center justify-center overflow-hidden rounded-xl border border-[#2D2D2D] bg-[#242424]">
+              <img
+                src={imageUrl}
+                alt="Preview"
+                className="h-full w-full object-cover"
+              />
               <div className="absolute bottom-3 right-3 flex gap-2">
                 <button
                   onClick={handleTakePhoto}
-                  className="bg-[#0F0F0F]/80 text-[10px] text-white font-extrabold px-3 py-1.5 rounded-full hover:bg-black flex items-center gap-1"
+                  className="flex items-center gap-1 rounded-full bg-[#0F0F0F]/80 px-3 py-1.5 text-[10px] font-extrabold text-white hover:bg-black"
                 >
                   <Camera size={12} /> Câmera
                 </button>
                 <button
                   onClick={handlePickFromLibrary}
-                  className="bg-[#0F0F0F]/80 text-[10px] text-white font-extrabold px-3 py-1.5 rounded-full hover:bg-black flex items-center gap-1"
+                  className="flex items-center gap-1 rounded-full bg-[#0F0F0F]/80 px-3 py-1.5 text-[10px] font-extrabold text-white hover:bg-black"
                 >
-                  <ImageIcon size={12} /> Galeria
+                  <ImageIcon size={12} /> Galeria / Google Fotos
                 </button>
               </div>
             </div>
           ) : (
-            <div className="h-72 rounded-xl bg-[#242424] border border-dashed border-[#3D3D3D] flex flex-col items-center justify-center gap-3 p-4">
-              <p className="text-[11px] text-[#808080]">Bora postar um story? Escolhe a foto 👇</p>
-              <div className="flex gap-2 w-full">
+            <div className="flex h-72 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-[#3D3D3D] bg-[#242424] p-4">
+              <p className="text-[11px] text-[#808080]">
+                Bora postar um story? Escolhe a foto 👇
+              </p>
+              <div className="flex w-full gap-2">
                 <Button
                   onClick={handleTakePhoto}
-                  className="flex-1 rounded-full text-xs bg-gradient-to-tr from-primary to-[#FF8C61]"
+                  className="flex-1 rounded-full bg-gradient-to-tr from-primary to-[#FF8C61] text-xs"
                 >
                   <Camera size={14} className="mr-1.5" /> Tirar foto
                 </Button>
                 <Button
                   onClick={handlePickFromLibrary}
                   variant="outline"
-                  className="flex-1 rounded-full text-xs border-[#3D3D3D] hover:bg-[#242424]"
+                  className="flex-1 rounded-full border-[#3D3D3D] text-xs hover:bg-[#242424]"
                 >
-                  <ImageIcon size={14} className="mr-1.5" /> Galeria
+                  <ImageIcon size={14} className="mr-1.5" /> Galeria / Google
+                  Fotos
                 </Button>
               </div>
             </div>
           )}
 
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-[#A0A0A0]">Legenda do Story (opcional)</label>
+            <label className="text-xs font-bold text-[#A0A0A0]">
+              Legenda do Story (opcional)
+            </label>
             <input
               type="text"
               placeholder="Amassando no rolê com a tropa... 🍔"
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
-              className="w-full bg-[#242424] border border-[#2D2D2D] rounded-xl px-3 py-3 text-xs text-white outline-none focus:border-primary"
+              className="w-full rounded-xl border border-[#2D2D2D] bg-[#242424] px-3 py-3 text-xs text-white outline-none focus:border-primary"
             />
           </div>
 
@@ -212,7 +202,7 @@ export function StoriesScreen() {
             <select
               value={taggedRestaurantId}
               onChange={(e) => setTaggedRestaurantId(e.target.value)}
-              className="w-full bg-[#242424] border border-[#2D2D2D] rounded-xl px-3 py-3 text-xs text-white outline-none focus:border-primary"
+              className="w-full rounded-xl border border-[#2D2D2D] bg-[#242424] px-3 py-3 text-xs text-white outline-none focus:border-primary"
             >
               <option value="">Sem marcação</option>
               {restaurants?.map((r) => (
@@ -237,9 +227,14 @@ export function StoriesScreen() {
 
   if (!stories || stories.length === 0) {
     return (
-      <div className="text-center py-16 space-y-4 max-w-md mx-auto">
-        <p className="text-xs text-[#808080] italic">Nenhum story por aqui ainda.</p>
-        <Button onClick={() => setIsCreating(true)} className="rounded-full text-xs">
+      <div className="mx-auto max-w-md space-y-4 py-16 text-center">
+        <p className="text-xs italic text-[#808080]">
+          Nenhum story por aqui ainda.
+        </p>
+        <Button
+          onClick={() => setIsCreating(true)}
+          className="rounded-full text-xs"
+        >
           <Camera size={13} className="mr-1.5" /> Lançar o Primeiro!
         </Button>
       </div>
@@ -248,26 +243,43 @@ export function StoriesScreen() {
 
   const currentStory = stories[currentIndex]
   const isMyStory = currentStory.userId === sessionUser?.id
+  const storyUsername = (
+    currentStory.user?.username ?? currentStory.userId.replace('u_', '')
+  ).replace(/^@/, '')
   const taggedRestaurant =
     currentStory.restaurant ??
     restaurants?.find((r) => r.id === currentStory.restaurantId)
 
   return (
-    <div className="relative h-[calc(100vh-80px)] w-full max-w-md mx-auto rounded-3xl bg-[#000] overflow-hidden flex flex-col justify-between">
+    <div className="relative mx-auto flex h-[calc(100vh-80px)] w-full max-w-md flex-col justify-between overflow-hidden rounded-3xl bg-[#000]">
       {/* Background Image */}
-      <img src={currentStory.photoUrl} alt="Story" className="absolute inset-0 w-full h-full object-cover" />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/60 pointer-events-none" />
+      <img
+        src={currentStory.photoUrl}
+        alt="Story"
+        className="absolute inset-0 h-full w-full object-cover"
+      />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/60" />
 
       {/* Top Bar with progress indicators and author */}
-      <div className="relative z-10 p-4 space-y-3">
+      <div className="relative z-10 space-y-3 p-4">
         {/* Progress bars */}
         <div className="flex gap-1.5">
-          {stories.map((_, idx) => (
-            <div key={idx} className="h-1 flex-1 bg-white/20 rounded-full overflow-hidden">
+          {stories.map((story, idx) => (
+            <div
+              key={idx}
+              className="h-1 flex-1 overflow-hidden rounded-full bg-white/20"
+            >
               <div
-                className="h-full bg-white transition-all duration-75"
+                key={story.id}
+                onAnimationEnd={idx === currentIndex ? handleNext : undefined}
+                className={`h-full bg-white ${idx === currentIndex ? 'story-progress' : ''}`}
                 style={{
-                  width: idx === currentIndex ? `${progress}%` : idx < currentIndex ? '100%' : '0%'
+                  width:
+                    idx < currentIndex
+                      ? '100%'
+                      : idx === currentIndex
+                        ? undefined
+                        : '0%',
                 }}
               />
             </div>
@@ -277,19 +289,26 @@ export function StoriesScreen() {
         {/* User Info */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-full bg-primary/20 border-2 border-primary text-white flex items-center justify-center font-bold text-xs uppercase overflow-hidden">
+            <div className="bg-primary/20 flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border-2 border-primary text-xs font-bold uppercase text-white">
               {currentStory.user?.avatarUrl ? (
-                <img src={currentStory.user.avatarUrl} alt="" className="h-full w-full object-cover" />
+                <img
+                  src={currentStory.user.avatarUrl}
+                  alt=""
+                  className="h-full w-full object-cover"
+                />
               ) : (
                 (currentStory.user?.displayName ?? 'U').slice(0, 2)
               )}
             </div>
             <div>
               <p className="text-xs font-black text-white">
-                @{currentStory.user?.username ?? 'usuario'}
+                @{storyUsername || 'usuario'}
               </p>
               <p className="text-[9px] text-white/70">
-                {new Date(currentStory.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                {new Date(currentStory.createdAt).toLocaleTimeString('pt-BR', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
               </p>
             </div>
           </div>
@@ -297,13 +316,13 @@ export function StoriesScreen() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setIsCreating(true)}
-              className="bg-white/10 hover:bg-white/20 rounded-full p-2 text-white transition-all"
+              className="rounded-full bg-white/10 p-2 text-white transition-all hover:bg-white/20"
             >
               <Camera size={16} />
             </button>
             <button
               onClick={() => navigate('/')}
-              className="bg-white/10 hover:bg-white/20 rounded-full p-2 text-white transition-all"
+              className="rounded-full bg-white/10 p-2 text-white transition-all hover:bg-white/20"
             >
               <X size={16} />
             </button>
@@ -312,11 +331,17 @@ export function StoriesScreen() {
       </div>
 
       {/* Navigation hotspots */}
-      <div className="absolute inset-y-20 left-0 w-1/3 z-20 cursor-pointer" onClick={handlePrev} />
-      <div className="absolute inset-y-20 right-0 w-1/3 z-20 cursor-pointer" onClick={handleNext} />
+      <div
+        className="absolute inset-y-20 left-0 z-20 w-1/3 cursor-pointer"
+        onClick={handlePrev}
+      />
+      <div
+        className="absolute inset-y-20 right-0 z-20 w-1/3 cursor-pointer"
+        onClick={handleNext}
+      />
 
       {/* Bottom overlay with restaurant tag, caption & viewers (z-30 to beat the nav hotspots) */}
-      <div className="relative z-30 p-4 space-y-3">
+      <div className="relative z-30 space-y-3 p-4">
         {/* Tagged restaurant chip */}
         {taggedRestaurant && (
           <button
@@ -329,7 +354,7 @@ export function StoriesScreen() {
         )}
 
         {currentStory.caption && (
-          <p className="text-sm font-bold text-white text-shadow leading-relaxed">
+          <p className="text-shadow text-sm font-bold leading-relaxed text-white">
             {currentStory.caption}
           </p>
         )}
@@ -366,7 +391,10 @@ export function StoriesScreen() {
                 className="flex items-center gap-2.5 rounded-xl border border-[#2D2D2D] bg-[#242424] p-2.5"
               >
                 <Avatar
-                  fallback={viewerId.replace('u_', '').slice(0, 2).toUpperCase()}
+                  fallback={viewerId
+                    .replace('u_', '')
+                    .slice(0, 2)
+                    .toUpperCase()}
                   size="sm"
                 />
                 <span className="text-xs font-bold text-white">

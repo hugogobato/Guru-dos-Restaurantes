@@ -74,6 +74,7 @@ function ok<T>(res: { data: T; error: any }): T {
 const nowIso = () => new Date().toISOString()
 const daysAgoIso = (d: number) =>
   new Date(Date.now() - d * 24 * 60 * 60 * 1000).toISOString()
+const MAX_LIST_ROWS = 200
 
 // PostgREST embed graphs reused across queries. `users` is embedded via an
 // explicit FK-constraint hint (e.g. !reviews_user_id_fkey) because reviews and
@@ -83,7 +84,8 @@ const REVIEW_SELECT =
   '*, author:users!reviews_user_id_fkey(*), restaurant:restaurants(*), comments(*, author:users!comments_user_id_fkey(*))'
 const GROUP_SELECT = '*, group_members(*, member:users(*))'
 const LIST_SELECT = '*, list_items(*, restaurant:restaurants(*))'
-const STORY_SELECT = '*, author:users(*), restaurant:restaurants(*)'
+const STORY_SELECT =
+  'id,user_id,restaurant_id,photo_url,caption,viewers,expires_at,created_at,author:users(id,username,display_name,avatar_url),restaurant:restaurants(id,name,address)'
 const NOTIFICATION_SELECT =
   '*, actor:users!notifications_actor_id_fkey(*), target_review:reviews(*), target_restaurant:restaurants(*), target_group:groups(*), target_list:custom_lists(*)'
 
@@ -195,7 +197,11 @@ export class SupabaseRestaurantRepository implements RestaurantRepository {
   }
   async getRestaurants(): Promise<Restaurant[]> {
     const data = ok(
-      await supabase.from('restaurants').select('*').order('name')
+      await supabase
+        .from('restaurants')
+        .select('*')
+        .order('name')
+        .limit(MAX_LIST_ROWS)
     )
     return (data ?? []).map(mapRestaurant)
   }
@@ -205,6 +211,7 @@ export class SupabaseRestaurantRepository implements RestaurantRepository {
         .from('restaurants')
         .select('*')
         .ilike('address->>city', city)
+        .limit(MAX_LIST_ROWS)
     )
     return (data ?? []).map(mapRestaurant)
   }
@@ -227,7 +234,11 @@ export class SupabaseRestaurantRepository implements RestaurantRepository {
 export class SupabaseReviewRepository implements ReviewRepository {
   async getReviewById(id: string): Promise<Review | null> {
     const data = ok(
-      await supabase.from('reviews').select(REVIEW_SELECT).eq('id', id).maybeSingle()
+      await supabase
+        .from('reviews')
+        .select(REVIEW_SELECT)
+        .eq('id', id)
+        .maybeSingle()
     )
     if (!data) return null
     return mapReview(data, await likedSet([data.id]))
@@ -238,6 +249,7 @@ export class SupabaseReviewRepository implements ReviewRepository {
         .from('reviews')
         .select(REVIEW_SELECT)
         .order('created_at', { ascending: false })
+        .limit(MAX_LIST_ROWS)
     )
     const rows = data ?? []
     const liked = await likedSet(rows.map((r: any) => r.id))
@@ -250,6 +262,7 @@ export class SupabaseReviewRepository implements ReviewRepository {
         .select(REVIEW_SELECT)
         .eq('restaurant_id', restaurantId)
         .order('created_at', { ascending: false })
+        .limit(MAX_LIST_ROWS)
     )
     const rows = data ?? []
     const liked = await likedSet(rows.map((r: any) => r.id))
@@ -262,13 +275,17 @@ export class SupabaseReviewRepository implements ReviewRepository {
         .select(REVIEW_SELECT)
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
+        .limit(MAX_LIST_ROWS)
     )
     const rows = data ?? []
     const liked = await likedSet(rows.map((r: any) => r.id))
     return rows.map((r: any) => mapReview(r, liked))
   }
   async postReview(
-    review: Omit<Review, 'id' | 'createdAt' | 'likes' | 'comments' | 'isLikedByMe'>
+    review: Omit<
+      Review,
+      'id' | 'createdAt' | 'likes' | 'comments' | 'isLikedByMe'
+    >
   ): Promise<Review> {
     // Insert with a plain `*` select (no embeds): embed resolution can fail on a
     // fresh row / stale schema cache, which previously made the whole post throw
@@ -287,8 +304,36 @@ export class SupabaseReviewRepository implements ReviewRepository {
       rid: review.restaurantId,
       uid: review.userId,
     })
-    if (rpcError) console.warn('increment_review_counts failed:', rpcError.message)
+    if (rpcError)
+      console.warn('increment_review_counts failed:', rpcError.message)
     return mapReview(data)
+  }
+  async deleteReview(reviewId: string, userId: string): Promise<void> {
+    const existing = ok(
+      await supabase
+        .from('reviews')
+        .select('restaurant_id, user_id')
+        .eq('id', reviewId)
+        .maybeSingle()
+    )
+    if (!existing) return
+    if (existing.user_id !== userId) throw new Error('NOT_AUTHORIZED')
+
+    ok(
+      await supabase
+        .from('reviews')
+        .delete()
+        .eq('id', reviewId)
+        .eq('user_id', userId)
+    )
+
+    // Counters are intentionally maintained by RPCs so seed data remains intact.
+    const { error: rpcError } = await supabase.rpc('decrement_review_counts', {
+      rid: existing.restaurant_id,
+      uid: userId,
+    })
+    if (rpcError)
+      console.warn('decrement_review_counts failed:', rpcError.message)
   }
   async toggleLike(reviewId: string, userId: string): Promise<boolean> {
     const existing = ok(
@@ -351,6 +396,7 @@ export class SupabaseVibeCheckRepository implements VibeCheckRepository {
         .eq('restaurant_id', restaurantId)
         .gt('expires_at', nowIso())
         .order('created_at', { ascending: false })
+        .limit(MAX_LIST_ROWS)
     )
     return (data ?? []).map(mapVibeCheck)
   }
@@ -388,12 +434,19 @@ export class SupabaseGroupRepository implements GroupRepository {
   }
   async getGroupById(id: string): Promise<Group | null> {
     const data = ok(
-      await supabase.from('groups').select(GROUP_SELECT).eq('id', id).maybeSingle()
+      await supabase
+        .from('groups')
+        .select(GROUP_SELECT)
+        .eq('id', id)
+        .maybeSingle()
     )
     return data ? mapGroup(data) : null
   }
   async createGroup(
-    group: Omit<Group, 'id' | 'createdAt' | 'members' | 'memberCount' | 'groupRankings'>
+    group: Omit<
+      Group,
+      'id' | 'createdAt' | 'members' | 'memberCount' | 'groupRankings'
+    >
   ): Promise<Group> {
     const created = ok(
       await supabase
@@ -420,7 +473,11 @@ export class SupabaseGroupRepository implements GroupRepository {
       })
     )
     const full = ok(
-      await supabase.from('groups').select(GROUP_SELECT).eq('id', createdId).single()
+      await supabase
+        .from('groups')
+        .select(GROUP_SELECT)
+        .eq('id', createdId)
+        .single()
     )
     return mapGroup(full)
   }
@@ -470,18 +527,28 @@ export class SupabaseGroupRepository implements GroupRepository {
 export class SupabaseListRepository implements ListRepository {
   async getLists(): Promise<CustomList[]> {
     const data = ok(
-      await supabase.from('custom_lists').select(LIST_SELECT).order('created_at')
+      await supabase
+        .from('custom_lists')
+        .select(LIST_SELECT)
+        .order('created_at')
     )
     return (data ?? []).map(mapList)
   }
   async getListById(id: string): Promise<CustomList | null> {
     const data = ok(
-      await supabase.from('custom_lists').select(LIST_SELECT).eq('id', id).maybeSingle()
+      await supabase
+        .from('custom_lists')
+        .select(LIST_SELECT)
+        .eq('id', id)
+        .maybeSingle()
     )
     return data ? mapList(data) : null
   }
   async createList(
-    list: Omit<CustomList, 'id' | 'createdAt' | 'updatedAt' | 'followerCount' | 'restaurants'>
+    list: Omit<
+      CustomList,
+      'id' | 'createdAt' | 'updatedAt' | 'followerCount' | 'restaurants'
+    >
   ): Promise<CustomList> {
     const data = ok(
       await supabase
@@ -554,7 +621,10 @@ export class SupabaseListRepository implements ListRepository {
       .eq('id', listId)
     return mapListItem(data)
   }
-  async removeRestaurantFromList(listId: string, restaurantId: string): Promise<void> {
+  async removeRestaurantFromList(
+    listId: string,
+    restaurantId: string
+  ): Promise<void> {
     ok(
       await supabase
         .from('list_items')
@@ -625,6 +695,7 @@ export class SupabaseStoryRepository implements StoryRepository {
         .select(STORY_SELECT)
         .gt('expires_at', nowIso())
         .order('created_at', { ascending: false })
+        .limit(MAX_LIST_ROWS)
     )
     return (data ?? []).map(mapStory)
   }
@@ -702,7 +773,10 @@ export class SupabaseIllnessRepository implements IllnessRepository {
     )
     return mapIllness(data)
   }
-  async checkUserReportLimit(restaurantId: string, userId: string): Promise<boolean> {
+  async checkUserReportLimit(
+    restaurantId: string,
+    userId: string
+  ): Promise<boolean> {
     // RLS select-own means this only ever sees the caller's own rows.
     const data = ok(
       await supabase
@@ -731,7 +805,9 @@ export class SupabaseDuelRepository implements DuelRepository {
     )
     return (data ?? []).map(mapDuel)
   }
-  async postDuel(duel: Omit<RestaurantDuel, 'id' | 'createdAt'>): Promise<RestaurantDuel> {
+  async postDuel(
+    duel: Omit<RestaurantDuel, 'id' | 'createdAt'>
+  ): Promise<RestaurantDuel> {
     const data = ok(
       await supabase
         .from('restaurant_duels')
@@ -771,7 +847,10 @@ export class SupabaseDuelRepository implements DuelRepository {
   async getEloLeaderboard(cuisine: RestaurantCategory): Promise<CuisineElo[]> {
     // Merge every restaurant of this cuisine with its ELO row (defaulting to 1000).
     const [restos, elos] = await Promise.all([
-      supabase.from('restaurants').select('id, elo_by_cuisine').contains('categories', [cuisine]),
+      supabase
+        .from('restaurants')
+        .select('id, elo_by_cuisine')
+        .contains('categories', [cuisine]),
       supabase.from('cuisine_elos').select('*').eq('cuisine', cuisine),
     ])
     const restoRows = ok(restos)
@@ -846,7 +925,10 @@ export class SupabaseAiRepository implements AiRepository {
     )
     return data ? mapAiProfile(data) : null
   }
-  async updateAiUserProfile(userId: string, markdown: string): Promise<AiUserProfile> {
+  async updateAiUserProfile(
+    userId: string,
+    markdown: string
+  ): Promise<AiUserProfile> {
     const existing = ok(
       await supabase
         .from('ai_user_profiles')

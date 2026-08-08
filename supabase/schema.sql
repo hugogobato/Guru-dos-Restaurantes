@@ -195,6 +195,8 @@ create table if not exists public.stories (
   expires_at    timestamptz not null default (now() + interval '24 hours'),
   created_at    timestamptz not null default now()
 );
+create index if not exists stories_expires_idx on public.stories(expires_at);
+create index if not exists stories_created_idx on public.stories(created_at desc);
 
 -- reporter_user_id is sensitive: never selectable by clients (see RLS + views below).
 create table if not exists public.illness_reports (
@@ -311,6 +313,17 @@ create or replace function public.increment_review_counts(rid text, uid text)
 returns void language sql security definer set search_path = public as $$
   update public.restaurants set review_count = review_count + 1 where id = rid;
   update public.users set review_count = review_count + 1 where id = uid;
+$$;
+
+create or replace function public.decrement_review_counts(rid text, uid text)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if uid is distinct from public.current_uid() then
+    raise exception 'NOT_AUTHORIZED';
+  end if;
+  update public.restaurants set review_count = greatest(0, review_count - 1) where id = rid;
+  update public.users set review_count = greatest(0, review_count - 1) where id = uid;
+end;
 $$;
 
 create or replace function public.increment_vibe_count(rid text)

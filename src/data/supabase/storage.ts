@@ -34,14 +34,14 @@ export async function uploadImages(
   dataUrls: string[],
   folder: string
 ): Promise<string[]> {
-  const out: string[] = []
-  for (const url of dataUrls) {
-    try {
-      out.push(await uploadImage(url, folder))
-    } catch (e) {
-      console.warn('Image upload failed, storing inline as fallback:', e)
-      out.push(url)
-    }
-  }
-  return out
+  return Promise.all(
+    dataUrls.map(async (url) => {
+      try {
+        return await uploadImage(url, folder)
+      } catch (e) {
+        console.warn('Image upload failed, storing inline as fallback:', e)
+        return url
+      }
+    })
+  )
 }

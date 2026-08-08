@@ -1,14 +1,36 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Calendar, Users, DollarSign, Trophy, Check, AlertTriangle, Camera, Image as ImageIcon, X } from 'lucide-react'
+import {
+  Calendar,
+  Users,
+  DollarSign,
+  Trophy,
+  Check,
+  AlertTriangle,
+  Camera,
+  Image as ImageIcon,
+  X,
+} from 'lucide-react'
 import { Button } from '../../components/ui/Button'
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card'
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '../../components/ui/Card'
 import { Dialog } from '../../components/ui/Dialog'
 import { toast } from '../../components/ui/Toast'
-import { useRestaurants, usePostReview, useSessionUser, useGroups, useFollowing, useUpdateRestaurant } from '../../lib/query/hooks'
+import {
+  useRestaurants,
+  usePostReview,
+  useSessionUser,
+  useGroups,
+  useFollowing,
+  useUpdateRestaurant,
+} from '../../lib/query/hooks'
 import { useReviewDraftStore } from '../../lib/store/reviewDraftStore'
 import { MetricId, RestaurantCategory, PriceRange } from '../../domain/models'
 import { getUnionOfMetrics } from '../../domain/logic/metrics-union'
@@ -42,40 +64,65 @@ const STANDARD_METRICS: MetricId[] = [
 const MAX_PHOTOS = 4
 
 // Zod Validation Schema
-const reviewSchema = z.object({
-  isNewRestaurant: z.boolean(),
-  restaurantId: z.string().optional(),
-  // New restaurant fields
-  newRestaurantName: z.string().optional(),
-  newCuisine: z.nativeEnum(RestaurantCategory).optional(),
-  newNeighborhood: z.string().optional(),
-  newPriceRange: z.nativeEnum(PriceRange).optional(),
-  // Other fields
-  visitDate: z.string().min(1, 'Selecione a data, parça'),
-  partySize: z.number().min(1, 'Deve ter pelo menos 1 pessoa'),
-  totalSpent: z.number().positive('Gasto deve ser positivo, chef').optional(),
-  comment: z.string().max(200, 'Mural de no máximo 200 caracteres').optional(),
-  overallScore: z.number().min(1).max(5),
-}).superRefine((data, ctx) => {
-  if (data.isNewRestaurant) {
-    if (!data.newRestaurantName) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Nome do pico é obrigatório', path: ['newRestaurantName'] })
+const reviewSchema = z
+  .object({
+    isNewRestaurant: z.boolean(),
+    restaurantId: z.string().optional(),
+    // New restaurant fields
+    newRestaurantName: z.string().optional(),
+    newCuisine: z.nativeEnum(RestaurantCategory).optional(),
+    newNeighborhood: z.string().optional(),
+    newPriceRange: z.nativeEnum(PriceRange).optional(),
+    // Other fields
+    visitDate: z.string().min(1, 'Selecione a data, parça'),
+    partySize: z.number().min(1, 'Deve ter pelo menos 1 pessoa'),
+    totalSpent: z.number().positive('Gasto deve ser positivo, chef').optional(),
+    comment: z
+      .string()
+      .max(200, 'Mural de no máximo 200 caracteres')
+      .optional(),
+    overallScore: z.number().min(1).max(5),
+  })
+  .superRefine((data, ctx) => {
+    if (data.isNewRestaurant) {
+      if (!data.newRestaurantName) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Nome do pico é obrigatório',
+          path: ['newRestaurantName'],
+        })
+      }
+      if (!data.newCuisine) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Culinária é obrigatória',
+          path: ['newCuisine'],
+        })
+      }
+      if (!data.newNeighborhood) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Bairro é obrigatório',
+          path: ['newNeighborhood'],
+        })
+      }
+      if (!data.newPriceRange) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Preço é obrigatório',
+          path: ['newPriceRange'],
+        })
+      }
+    } else {
+      if (!data.restaurantId) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Selecione o pico, chef',
+          path: ['restaurantId'],
+        })
+      }
     }
-    if (!data.newCuisine) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Culinária é obrigatória', path: ['newCuisine'] })
-    }
-    if (!data.newNeighborhood) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Bairro é obrigatório', path: ['newNeighborhood'] })
-    }
-    if (!data.newPriceRange) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Preço é obrigatório', path: ['newPriceRange'] })
-    }
-  } else {
-    if (!data.restaurantId) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Selecione o pico, chef', path: ['restaurantId'] })
-    }
-  }
-})
+  })
 
 type ReviewFormValues = z.infer<typeof reviewSchema>
 
@@ -89,13 +136,13 @@ const STEPS = {
 export function ReviewFlowScreen() {
   const navigate = useNavigate()
   const [step, setStep] = useState(STEPS.WHERE_WHEN)
-  
+
   // Queries & Mutations
   const { data: restaurants } = useRestaurants()
   const { data: sessionUser } = useSessionUser()
   const { data: groups } = useGroups()
   const { data: followingList } = useFollowing(sessionUser?.id || '')
-  
+
   const createRestaurantMutation = useUpdateRestaurant()
   const postReviewMutation = usePostReview()
 
@@ -132,10 +179,12 @@ export function ReviewFlowScreen() {
   const formComment = watch('comment')
 
   // Companions and targets checklist state
-  const [selectedCompanions, setSelectedCompanions] = useState<string[]>(draft.companions)
-  const [selectedDestinations, setSelectedDestinations] = useState<{ type: 'profile' | 'group'; id: string }[]>(
-    draft.targetDestinations
+  const [selectedCompanions, setSelectedCompanions] = useState<string[]>(
+    draft.companions
   )
+  const [selectedDestinations, setSelectedDestinations] = useState<
+    { type: 'profile' | 'group'; id: string }[]
+  >(draft.targetDestinations)
   const [metricRatings, setMetricRatings] = useState<Record<string, number>>(
     draft.metrics
   )
@@ -143,9 +192,41 @@ export function ReviewFlowScreen() {
   // persisted draft would blow the localStorage quota.
   const [photos, setPhotos] = useState<string[]>([])
 
+  // Reviews can only be shared with groups where the current user is a member.
+  // Keeping this list scoped also makes the destination picker much easier to
+  // understand when there are many public groups in the app.
+  const memberGroups = useMemo(
+    () =>
+      groups?.filter((group) =>
+        group.members.some((member) => member.userId === sessionUser?.id)
+      ) || [],
+    [groups, sessionUser?.id]
+  )
+  const memberGroupIds = useMemo(
+    () => new Set(memberGroups.map((group) => group.id)),
+    [memberGroups]
+  )
+  const sessionUserId = sessionUser?.id
+  // Older drafts used the mock-only `u_me` profile id. Rebind that mandatory
+  // destination during render and discard stale group picks before publishing.
+  const normalizedDestinations = useMemo(() => {
+    if (!sessionUserId) return selectedDestinations
+    return [
+      { type: 'profile' as const, id: sessionUserId },
+      ...selectedDestinations.filter(
+        (destination) =>
+          destination.type === 'group' && memberGroupIds.has(destination.id)
+      ),
+    ]
+  }, [memberGroupIds, selectedDestinations, sessionUserId])
+
   // Duel trigger popup state
   const [showDuelDialog, setShowDuelDialog] = useState(false)
-  const [duelDetails, setDuelDetails] = useState<{ aId: string; bId: string; cuisine: RestaurantCategory } | null>(null)
+  const [duelDetails, setDuelDetails] = useState<{
+    aId: string
+    bId: string
+    cuisine: RestaurantCategory
+  } | null>(null)
 
   // Persist form state changes in Zustand
   useEffect(() => {
@@ -157,7 +238,7 @@ export function ReviewFlowScreen() {
       overallScore: formOverallScore,
       comment: formComment,
       companions: selectedCompanions,
-      targetDestinations: selectedDestinations,
+      targetDestinations: normalizedDestinations,
       metrics: metricRatings,
     })
   }, [
@@ -168,22 +249,27 @@ export function ReviewFlowScreen() {
     formOverallScore,
     formComment,
     selectedCompanions,
-    selectedDestinations,
+    normalizedDestinations,
     metricRatings,
   ])
 
   // Compute union of mandatory metrics based on selected groups
-  const activeGroups = groups?.filter((g) =>
-    selectedDestinations.some((d) => d.type === 'group' && d.id === g.id)
-  ) || []
-  const unionMetrics = getUnionOfMetrics(activeGroups.map((g) => g.mandatoryMetrics))
+  const activeGroups =
+    groups?.filter((g) =>
+      normalizedDestinations.some((d) => d.type === 'group' && d.id === g.id)
+    ) || []
+  const unionMetrics = getUnionOfMetrics(
+    activeGroups.map((g) => g.mandatoryMetrics)
+  )
 
   const handleNext = () => setStep(step + 1)
   const handleBack = () => setStep(step - 1)
 
   const toggleCompanion = (id: string) => {
     setSelectedCompanions((prev) => {
-      const updated = prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+      const updated = prev.includes(id)
+        ? prev.filter((item) => item !== id)
+        : [...prev, id]
       // Sync partySize automatically with companions count + 1
       setValue('partySize', updated.length + 1)
       return updated
@@ -192,10 +278,14 @@ export function ReviewFlowScreen() {
 
   const toggleDestination = (type: 'profile' | 'group', id: string) => {
     setSelectedDestinations((prev) => {
+      if (type === 'profile') {
+        return [
+          { type, id },
+          ...prev.filter((destination) => destination.type === 'group'),
+        ]
+      }
       const exists = prev.some((d) => d.type === type && d.id === id)
       if (exists) {
-        // profile is mandatory
-        if (type === 'profile') return prev
         return prev.filter((d) => !(d.type === type && d.id === id))
       }
       return [...prev, { type, id }]
@@ -211,7 +301,8 @@ export function ReviewFlowScreen() {
       toast(`Máximo de ${MAX_PHOTOS} fotos, chef`, 'info')
       return
     }
-    const photo = source === 'camera' ? await takePhoto() : await pickFromLibrary()
+    const photo =
+      source === 'camera' ? await takePhoto() : await pickFromLibrary()
     if (photo) setPhotos((prev) => [...prev, photo])
   }
 
@@ -230,7 +321,9 @@ export function ReviewFlowScreen() {
     // the new-restaurant record and the review (falls back to inline if Storage
     // is unreachable).
     const uploadedPhotos =
-      photos.length > 0 ? await uploadImages(photos, `reviews/${sessionUser.id}`) : []
+      photos.length > 0
+        ? await uploadImages(photos, `reviews/${sessionUser.id}`)
+        : []
 
     // 1. Register Lugar Novo if applicable
     if (values.isNewRestaurant) {
@@ -260,8 +353,10 @@ export function ReviewFlowScreen() {
         menuPhotos: [],
         averageOverallScore: values.overallScore,
         averageMetrics: {
-          [MetricId.TASTE]: metricRatings[MetricId.TASTE] || values.overallScore,
-          [MetricId.COST_BENEFIT]: metricRatings[MetricId.COST_BENEFIT] || values.overallScore,
+          [MetricId.TASTE]:
+            metricRatings[MetricId.TASTE] || values.overallScore,
+          [MetricId.COST_BENEFIT]:
+            metricRatings[MetricId.COST_BENEFIT] || values.overallScore,
         } as Record<MetricId, number>,
         reviewCount: 1,
         vibeCheckCount: 0,
@@ -289,7 +384,7 @@ export function ReviewFlowScreen() {
     const satisfiedDestinations: typeof selectedDestinations = []
     const unsatisfiedGroupNames: string[] = []
 
-    selectedDestinations.forEach((dest) => {
+    normalizedDestinations.forEach((dest) => {
       if (dest.type === 'profile') {
         satisfiedDestinations.push(dest)
         return
@@ -327,7 +422,7 @@ export function ReviewFlowScreen() {
 
     try {
       await postReviewMutation.mutateAsync(reviewData)
-      
+
       // Success triggers confetti
       confetti({
         particleCount: 120,
@@ -351,8 +446,12 @@ export function ReviewFlowScreen() {
       // 4. ELO Duel Trigger logic (visited 2 of C in 30 days)
 
       // Check if user has reviewed another restaurant of same cuisine category in last 30 days
-      const mockCuisineReviews = restaurants?.filter((r) => r.id !== finalRestaurantId && r.categories.includes(cuisineType)) || []
-      
+      const mockCuisineReviews =
+        restaurants?.filter(
+          (r) =>
+            r.id !== finalRestaurantId && r.categories.includes(cuisineType)
+        ) || []
+
       if (mockCuisineReviews.length > 0) {
         const previousId = mockCuisineReviews[0].id
         setDuelDetails({
@@ -364,55 +463,63 @@ export function ReviewFlowScreen() {
       } else {
         navigate('/')
       }
-
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Deu ruim ao postar review!'
+      const msg =
+        err instanceof Error ? err.message : 'Deu ruim ao postar review!'
       toast(msg, 'error')
     }
   }
 
-  const perPersonCost = formTotalSpent && formPartySize > 0
-    ? (formTotalSpent / formPartySize).toFixed(0)
-    : null
+  const perPersonCost =
+    formTotalSpent && formPartySize > 0
+      ? (formTotalSpent / formPartySize).toFixed(0)
+      : null
 
   return (
-    <div className="space-y-6 max-w-md mx-auto pb-16">
+    <div className="mx-auto max-w-md space-y-6 pb-16">
       <div>
-        <h1 className="text-2xl font-extrabold text-white flex items-center gap-2">
+        <h1 className="flex items-center gap-2 text-2xl font-extrabold text-white">
           <span>{copy.cta.reviewPrimary}</span>
         </h1>
-        <p className="text-xs text-[#A0A0A0] mt-1">Sua resenha gastronômica</p>
+        <p className="mt-1 text-xs text-[#A0A0A0]">Sua resenha gastronômica</p>
       </div>
 
       <form onSubmit={handleSubmit(onSubmitForm)}>
         {/* Step 1: Onde e Quando */}
         {step === STEPS.WHERE_WHEN && (
-          <Card className="border-[#2D2D2D] bg-[#1A1A1A] p-4 space-y-4">
+          <Card className="space-y-4 border-[#2D2D2D] bg-[#1A1A1A] p-4">
             <CardHeader className="p-0">
-              <CardTitle className="text-sm font-bold text-white">Passo 1: Onde e Quando?</CardTitle>
+              <CardTitle className="text-sm font-bold text-white">
+                Passo 1: Onde e Quando?
+              </CardTitle>
             </CardHeader>
-            <CardContent className="p-0 space-y-4 pt-2">
-              
+            <CardContent className="space-y-4 p-0 pt-2">
               {/* Lugar Novo toggle switch */}
-              <div className="flex items-center justify-between p-3 bg-[#242424] rounded-xl border border-[#2D2D2D]">
+              <div className="flex items-center justify-between rounded-xl border border-[#2D2D2D] bg-[#242424] p-3">
                 <div>
-                  <p className="text-xs font-bold text-white">Pico não tá na lista?</p>
-                  <p className="text-[10px] text-[#808080]">Cadastrar pico novo no radar</p>
+                  <p className="text-xs font-bold text-white">
+                    Pico não tá na lista?
+                  </p>
+                  <p className="text-[10px] text-[#808080]">
+                    Cadastrar pico novo no radar
+                  </p>
                 </div>
                 <input
                   type="checkbox"
                   {...register('isNewRestaurant')}
-                  className="h-5 w-9 accent-primary cursor-pointer"
+                  className="h-5 w-9 cursor-pointer accent-primary"
                 />
               </div>
 
               {!isNewRestaurant ? (
                 // Dropdown of existing restaurants
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-[#A0A0A0]">Escolher Pico</label>
+                  <label className="text-xs font-bold text-[#A0A0A0]">
+                    Escolher Pico
+                  </label>
                   <select
                     {...register('restaurantId')}
-                    className="w-full bg-[#242424] border border-[#2D2D2D] rounded-xl px-3 py-3 text-xs text-white focus:outline-none focus:border-primary"
+                    className="w-full rounded-xl border border-[#2D2D2D] bg-[#242424] px-3 py-3 text-xs text-white focus:border-primary focus:outline-none"
                   >
                     <option value="">Selecione o pico...</option>
                     {restaurants?.map((r) => (
@@ -422,80 +529,102 @@ export function ReviewFlowScreen() {
                     ))}
                   </select>
                   {errors.restaurantId && (
-                    <p className="text-[10px] text-destructive font-semibold">{errors.restaurantId.message}</p>
+                    <p className="text-[10px] font-semibold text-destructive">
+                      {errors.restaurantId.message}
+                    </p>
                   )}
                 </div>
               ) : (
                 // Add Lugar Novo detailed fields
-                <div className="space-y-3 p-3 bg-[#242424]/50 border border-dashed border-[#3D3D3D] rounded-xl">
+                <div className="space-y-3 rounded-xl border border-dashed border-[#3D3D3D] bg-[#242424]/50 p-3">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-[#A0A0A0] uppercase">Nome do Pico</label>
+                    <label className="text-[10px] font-bold uppercase text-[#A0A0A0]">
+                      Nome do Pico
+                    </label>
                     <input
                       type="text"
                       placeholder="Ex: Podrão do Zé"
                       {...register('newRestaurantName')}
-                      className="w-full bg-[#242424] border border-[#2D2D2D] rounded-lg px-3 py-2 text-xs text-white"
+                      className="w-full rounded-lg border border-[#2D2D2D] bg-[#242424] px-3 py-2 text-xs text-white"
                     />
                     {errors.newRestaurantName && (
-                      <p className="text-[9px] text-destructive font-semibold">{errors.newRestaurantName.message}</p>
+                      <p className="text-[9px] font-semibold text-destructive">
+                        {errors.newRestaurantName.message}
+                      </p>
                     )}
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-[#A0A0A0] uppercase">Culinária</label>
+                    <label className="text-[10px] font-bold uppercase text-[#A0A0A0]">
+                      Culinária
+                    </label>
                     <select
                       {...register('newCuisine')}
-                      className="w-full bg-[#242424] border border-[#2D2D2D] rounded-lg px-3 py-2 text-xs text-white"
+                      className="w-full rounded-lg border border-[#2D2D2D] bg-[#242424] px-3 py-2 text-xs text-white"
                     >
                       <option value="">Selecione...</option>
                       {Object.values(RestaurantCategory).map((cat) => (
-                        <option key={cat} value={cat}>{cat}</option>
+                        <option key={cat} value={cat}>
+                          {cat}
+                        </option>
                       ))}
                     </select>
                     {errors.newCuisine && (
-                      <p className="text-[9px] text-destructive font-semibold">{errors.newCuisine.message}</p>
+                      <p className="text-[9px] font-semibold text-destructive">
+                        {errors.newCuisine.message}
+                      </p>
                     )}
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-[#A0A0A0] uppercase">Bairro</label>
+                    <label className="text-[10px] font-bold uppercase text-[#A0A0A0]">
+                      Bairro
+                    </label>
                     <input
                       type="text"
                       placeholder="Ex: Pinheiros"
                       {...register('newNeighborhood')}
-                      className="w-full bg-[#242424] border border-[#2D2D2D] rounded-lg px-3 py-2 text-xs text-white"
+                      className="w-full rounded-lg border border-[#2D2D2D] bg-[#242424] px-3 py-2 text-xs text-white"
                     />
                     {errors.newNeighborhood && (
-                      <p className="text-[9px] text-destructive font-semibold">{errors.newNeighborhood.message}</p>
+                      <p className="text-[9px] font-semibold text-destructive">
+                        {errors.newNeighborhood.message}
+                      </p>
                     )}
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-[#A0A0A0] uppercase">Preço Estimado</label>
+                    <label className="text-[10px] font-bold uppercase text-[#A0A0A0]">
+                      Preço Estimado
+                    </label>
                     <select
                       {...register('newPriceRange')}
-                      className="w-full bg-[#242424] border border-[#2D2D2D] rounded-lg px-3 py-2 text-xs text-white"
+                      className="w-full rounded-lg border border-[#2D2D2D] bg-[#242424] px-3 py-2 text-xs text-white"
                     >
                       <option value="">Selecione...</option>
                       {Object.values(PriceRange).map((price) => (
-                        <option key={price} value={price}>{price}</option>
+                        <option key={price} value={price}>
+                          {price}
+                        </option>
                       ))}
                     </select>
                     {errors.newPriceRange && (
-                      <p className="text-[9px] text-destructive font-semibold">{errors.newPriceRange.message}</p>
+                      <p className="text-[9px] font-semibold text-destructive">
+                        {errors.newPriceRange.message}
+                      </p>
                     )}
                   </div>
                 </div>
               )}
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-[#A0A0A0] flex items-center gap-1">
+                <label className="flex items-center gap-1 text-xs font-bold text-[#A0A0A0]">
                   <Calendar size={13} /> Data do Rolê
                 </label>
                 <input
                   type="date"
                   {...register('visitDate')}
-                  className="w-full bg-[#242424] border border-[#2D2D2D] rounded-xl px-3 py-3 text-xs text-white"
+                  className="w-full rounded-xl border border-[#2D2D2D] bg-[#242424] px-3 py-3 text-xs text-white"
                 />
               </div>
 
@@ -513,18 +642,19 @@ export function ReviewFlowScreen() {
 
         {/* Step 2: Galera e Grana */}
         {step === STEPS.PARTY_COST && (
-          <Card className="border-[#2D2D2D] bg-[#1A1A1A] p-4 space-y-4">
+          <Card className="space-y-4 border-[#2D2D2D] bg-[#1A1A1A] p-4">
             <CardHeader className="p-0">
-              <CardTitle className="text-sm font-bold text-white">Passo 2: Galera e Grana</CardTitle>
+              <CardTitle className="text-sm font-bold text-white">
+                Passo 2: Galera e Grana
+              </CardTitle>
             </CardHeader>
-            <CardContent className="p-0 space-y-4 pt-2">
-              
+            <CardContent className="space-y-4 p-0 pt-2">
               {/* Companions Checkbox list */}
               <div className="space-y-2">
-                <label className="text-xs font-bold text-[#A0A0A0] flex items-center gap-1.5">
+                <label className="flex items-center gap-1.5 text-xs font-bold text-[#A0A0A0]">
                   <Users size={13} /> Quem colou junto? (Companions)
                 </label>
-                <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto pr-1">
+                <div className="flex max-h-28 flex-wrap gap-1.5 overflow-y-auto pr-1">
                   {followingList?.map((user) => {
                     const isSelected = selectedCompanions.includes(user.id)
                     return (
@@ -532,62 +662,81 @@ export function ReviewFlowScreen() {
                         key={user.id}
                         type="button"
                         onClick={() => toggleCompanion(user.id)}
-                        className={`px-3 py-1.5 rounded-full border text-[11px] font-bold transition-all flex items-center gap-1 ${
+                        className={`flex items-center gap-1 rounded-full border px-3 py-1.5 text-[11px] font-bold transition-all ${
                           isSelected
-                            ? 'border-primary bg-primary/10 text-white'
+                            ? 'bg-primary/10 border-primary text-white'
                             : 'border-[#2D2D2D] bg-[#242424] text-[#808080]'
                         }`}
                       >
-                        {isSelected && <Check size={10} className="text-primary" />}
+                        {isSelected && (
+                          <Check size={10} className="text-primary" />
+                        )}
                         <span>@{user.username}</span>
                       </button>
                     )
                   })}
                   {(!followingList || followingList.length === 0) && (
-                    <p className="text-[10px] text-[#666] italic">Siga crias para convidá-los</p>
+                    <p className="text-[10px] italic text-[#666]">
+                      Siga crias para convidá-los
+                    </p>
                   )}
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-[#A0A0A0] flex items-center gap-1">
+                  <label className="flex items-center gap-1 text-xs font-bold text-[#A0A0A0]">
                     <DollarSign size={13} /> Valor Gasto
                   </label>
                   <input
                     type="number"
                     placeholder="Total R$"
                     {...register('totalSpent', { valueAsNumber: true })}
-                    className="w-full bg-[#242424] border border-[#2D2D2D] rounded-xl px-3 py-3 text-xs text-white"
+                    className="w-full rounded-xl border border-[#2D2D2D] bg-[#242424] px-3 py-3 text-xs text-white"
                   />
                   {errors.totalSpent && (
-                    <p className="text-[9px] text-destructive font-semibold">{errors.totalSpent.message}</p>
+                    <p className="text-[9px] font-semibold text-destructive">
+                      {errors.totalSpent.message}
+                    </p>
                   )}
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-[#A0A0A0]">Pessoas</label>
+                  <label className="text-xs font-bold text-[#A0A0A0]">
+                    Pessoas
+                  </label>
                   <input
                     type="number"
                     min="1"
                     {...register('partySize', { valueAsNumber: true })}
-                    className="w-full bg-[#242424] border border-[#2D2D2D] rounded-xl px-3 py-3 text-xs text-white"
+                    className="w-full rounded-xl border border-[#2D2D2D] bg-[#242424] px-3 py-3 text-xs text-white"
                   />
                 </div>
               </div>
 
               {perPersonCost && (
-                <div className="p-3 bg-primary/10 border border-primary/20 rounded-xl text-center">
+                <div className="bg-primary/10 border-primary/20 rounded-xl border p-3 text-center">
                   <p className="text-xs text-[#A0A0A0]">Gasto por cabeça</p>
-                  <p className="text-lg font-black text-primary">R$ {perPersonCost}/pessoa</p>
+                  <p className="text-lg font-black text-primary">
+                    R$ {perPersonCost}/pessoa
+                  </p>
                 </div>
               )}
 
               <div className="flex gap-2">
-                <Button type="button" variant="outline" onClick={handleBack} className="flex-1 rounded-full border-[#2D2D2D]">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleBack}
+                  className="flex-1 rounded-full border-[#2D2D2D]"
+                >
                   Voltar
                 </Button>
-                <Button type="button" onClick={handleNext} className="flex-1 rounded-full">
+                <Button
+                  type="button"
+                  onClick={handleNext}
+                  className="flex-1 rounded-full"
+                >
                   Próximo
                 </Button>
               </div>
@@ -597,53 +746,70 @@ export function ReviewFlowScreen() {
 
         {/* Step 3: Destinos e Regra */}
         {step === STEPS.METRICS_COMMENT && (
-          <Card className="border-[#2D2D2D] bg-[#1A1A1A] p-4 space-y-4">
+          <Card className="space-y-4 border-[#2D2D2D] bg-[#1A1A1A] p-4">
             <CardHeader className="p-0">
-              <CardTitle className="text-sm font-bold text-white">Passo 3: Notas e Destinos</CardTitle>
+              <CardTitle className="text-sm font-bold text-white">
+                Passo 3: Notas e Destinos
+              </CardTitle>
             </CardHeader>
-            <CardContent className="p-0 space-y-4 pt-2">
-              
+            <CardContent className="space-y-4 p-0 pt-2">
               {/* Target Destinations */}
               <div className="space-y-2">
-                <label className="text-xs font-bold text-[#A0A0A0]">Postar onde?</label>
+                <label className="text-xs font-bold text-[#A0A0A0]">
+                  Postar onde?
+                </label>
                 <div className="flex flex-col gap-2">
                   <button
                     type="button"
-                    onClick={() => toggleDestination('profile', 'u_me')}
-                    className="flex justify-between items-center p-2.5 rounded-xl border border-primary bg-primary/10 text-left text-xs font-bold text-white"
+                    onClick={() =>
+                      toggleDestination('profile', sessionUser?.id || '')
+                    }
+                    className="bg-primary/10 flex items-center justify-between rounded-xl border border-primary p-2.5 text-left text-xs font-bold text-white"
                   >
                     <span>👤 Meu Perfil (Obrigatório)</span>
                     <Check size={14} className="text-primary" />
                   </button>
 
-                  {groups?.map((g) => {
-                    const isSelected = selectedDestinations.some((d) => d.type === 'group' && d.id === g.id)
+                  {memberGroups.map((g) => {
+                    const isSelected = normalizedDestinations.some(
+                      (d) => d.type === 'group' && d.id === g.id
+                    )
                     return (
                       <button
                         key={g.id}
                         type="button"
                         onClick={() => toggleDestination('group', g.id)}
-                        className={`flex justify-between items-center p-2.5 rounded-xl border text-left text-xs font-bold ${
+                        className={`flex items-center justify-between rounded-xl border p-2.5 text-left text-xs font-bold ${
                           isSelected
-                            ? 'border-primary bg-primary/10 text-white'
+                            ? 'bg-primary/10 border-primary text-white'
                             : 'border-[#2D2D2D] bg-[#242424] text-[#A0A0A0]'
                         }`}
                       >
                         <div>
                           <p>👥 Tropa: {g.name}</p>
-                          <p className="text-[9px] text-[#808080] mt-0.5">Exige: {g.mandatoryMetrics.join(', ')}</p>
+                          <p className="mt-0.5 text-[9px] text-[#808080]">
+                            Exige: {g.mandatoryMetrics.join(', ')}
+                          </p>
                         </div>
-                        {isSelected && <Check size={14} className="text-primary" />}
+                        {isSelected && (
+                          <Check size={14} className="text-primary" />
+                        )}
                       </button>
                     )
                   })}
+                  {memberGroups.length === 0 && (
+                    <p className="rounded-xl border border-dashed border-[#3D3D3D] p-3 text-[10px] text-[#808080]">
+                      Você ainda não participa de nenhuma tropa. Entre em uma em
+                      Minhas Tropas para publicar nela.
+                    </p>
+                  )}
                 </div>
               </div>
 
               {/* Dynamic Union Metric Sliders */}
               {unionMetrics.length > 0 && (
-                <div className="space-y-3.5 p-3 bg-[#242424]/40 border border-[#2D2D2D] rounded-xl">
-                  <h4 className="text-[10px] font-bold text-[#808080] uppercase tracking-wider">
+                <div className="space-y-3.5 rounded-xl border border-[#2D2D2D] bg-[#242424]/40 p-3">
+                  <h4 className="text-[10px] font-bold uppercase tracking-wider text-[#808080]">
                     Métricas Obrigatórias das Tropas
                   </h4>
                   {unionMetrics.map((metric) => {
@@ -659,8 +825,10 @@ export function ReviewFlowScreen() {
                           min="1"
                           max="5"
                           value={val}
-                          onChange={(e) => handleMetricRate(metric, Number(e.target.value))}
-                          className="w-full accent-primary bg-[#2D2D2D]"
+                          onChange={(e) =>
+                            handleMetricRate(metric, Number(e.target.value))
+                          }
+                          className="w-full bg-[#2D2D2D] accent-primary"
                         />
                       </div>
                     )
@@ -669,15 +837,20 @@ export function ReviewFlowScreen() {
               )}
 
               {/* Standard optional metrics — always available (Sabor, Atendimento, etc.) */}
-              <div className="space-y-3 p-3 bg-[#242424]/40 border border-[#2D2D2D] rounded-xl">
-                <h4 className="text-[10px] font-bold text-[#808080] uppercase tracking-wider">
+              <div className="space-y-3 rounded-xl border border-[#2D2D2D] bg-[#242424]/40 p-3">
+                <h4 className="text-[10px] font-bold uppercase tracking-wider text-[#808080]">
                   Notas detalhadas (opcional)
                 </h4>
                 {STANDARD_METRICS.map((metric) => {
                   const val = metricRatings[metric] ?? 0
                   return (
-                    <div key={metric} className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-bold text-white">{METRIC_LABELS[metric]}</span>
+                    <div
+                      key={metric}
+                      className="flex items-center justify-between gap-2"
+                    >
+                      <span className="text-xs font-bold text-white">
+                        {METRIC_LABELS[metric]}
+                      </span>
                       <div className="flex items-center gap-1.5">
                         {[1, 2, 3, 4, 5].map((n) => (
                           <button
@@ -708,14 +881,21 @@ export function ReviewFlowScreen() {
 
               {/* Photos of the place (camera or gallery) */}
               <div className="space-y-2">
-                <label className="text-xs font-bold text-[#A0A0A0] flex items-center gap-1.5">
+                <label className="flex items-center gap-1.5 text-xs font-bold text-[#A0A0A0]">
                   <ImageIcon size={13} /> Fotos do rolê (opcional)
                 </label>
                 {photos.length > 0 && (
                   <div className="grid grid-cols-4 gap-2">
                     {photos.map((src, idx) => (
-                      <div key={idx} className="relative aspect-square overflow-hidden rounded-lg border border-[#2D2D2D]">
-                        <img src={src} alt={`Foto ${idx + 1}`} className="h-full w-full object-cover" />
+                      <div
+                        key={idx}
+                        className="relative aspect-square overflow-hidden rounded-lg border border-[#2D2D2D]"
+                      >
+                        <img
+                          src={src}
+                          alt={`Foto ${idx + 1}`}
+                          className="h-full w-full object-cover"
+                        />
                         <button
                           type="button"
                           onClick={() => removePhoto(idx)}
@@ -734,7 +914,7 @@ export function ReviewFlowScreen() {
                       type="button"
                       variant="outline"
                       onClick={() => handleAddPhoto('camera')}
-                      className="flex-1 rounded-full border-[#2D2D2D] text-xs h-9"
+                      className="h-9 flex-1 rounded-full border-[#2D2D2D] text-xs"
                     >
                       <Camera size={13} className="mr-1.5" /> Tirar foto
                     </Button>
@@ -742,9 +922,10 @@ export function ReviewFlowScreen() {
                       type="button"
                       variant="outline"
                       onClick={() => handleAddPhoto('gallery')}
-                      className="flex-1 rounded-full border-[#2D2D2D] text-xs h-9"
+                      className="h-9 flex-1 rounded-full border-[#2D2D2D] text-xs"
                     >
-                      <ImageIcon size={13} className="mr-1.5" /> Galeria
+                      <ImageIcon size={13} className="mr-1.5" /> Galeria /
+                      Google Fotos
                     </Button>
                   </div>
                 )}
@@ -752,7 +933,9 @@ export function ReviewFlowScreen() {
 
               {/* Overall Score */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-[#A0A0A0]">Nota Geral</label>
+                <label className="text-xs font-bold text-[#A0A0A0]">
+                  Nota Geral
+                </label>
                 <div className="flex gap-2">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <button
@@ -769,23 +952,36 @@ export function ReviewFlowScreen() {
 
               {/* Comment text area */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-[#A0A0A0]">Comentário</label>
+                <label className="text-xs font-bold text-[#A0A0A0]">
+                  Comentário
+                </label>
                 <textarea
                   placeholder="Comenta aí o que achou..."
                   rows={3}
                   {...register('comment')}
-                  className="w-full bg-[#242424] border border-[#2D2D2D] rounded-xl p-3 text-xs text-white outline-none focus:border-primary"
+                  className="w-full rounded-xl border border-[#2D2D2D] bg-[#242424] p-3 text-xs text-white outline-none focus:border-primary"
                 />
                 {errors.comment && (
-                  <p className="text-[9px] text-destructive font-semibold">{errors.comment.message}</p>
+                  <p className="text-[9px] font-semibold text-destructive">
+                    {errors.comment.message}
+                  </p>
                 )}
               </div>
 
               <div className="flex gap-2">
-                <Button type="button" variant="outline" onClick={handleBack} className="flex-1 rounded-full border-[#2D2D2D]">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleBack}
+                  className="flex-1 rounded-full border-[#2D2D2D]"
+                >
                   Voltar
                 </Button>
-                <Button type="button" onClick={handleNext} className="flex-1 rounded-full">
+                <Button
+                  type="button"
+                  onClick={handleNext}
+                  className="flex-1 rounded-full"
+                >
                   Ver Resumo
                 </Button>
               </div>
@@ -795,12 +991,14 @@ export function ReviewFlowScreen() {
 
         {/* Step 4: Preview / Resumo */}
         {step === STEPS.PREVIEW && (
-          <Card className="border-[#2D2D2D] bg-[#1A1A1A] p-4 space-y-4">
+          <Card className="space-y-4 border-[#2D2D2D] bg-[#1A1A1A] p-4">
             <CardHeader className="p-0">
-              <CardTitle className="text-sm font-bold text-white">Resumo do Review</CardTitle>
+              <CardTitle className="text-sm font-bold text-white">
+                Resumo do Review
+              </CardTitle>
             </CardHeader>
-            <CardContent className="p-0 space-y-4 pt-2">
-              <div className="p-3 bg-[#242424] rounded-xl text-xs space-y-2 text-[#E0E0E0]">
+            <CardContent className="space-y-4 p-0 pt-2">
+              <div className="space-y-2 rounded-xl bg-[#242424] p-3 text-xs text-[#E0E0E0]">
                 <p>
                   <span className="font-bold text-white">📍 Pico:</span>{' '}
                   {isNewRestaurant
@@ -808,35 +1006,42 @@ export function ReviewFlowScreen() {
                     : restaurants?.find((r) => r.id === formRestaurantId)?.name}
                 </p>
                 <p>
-                  <span className="font-bold text-white">📅 Data:</span> {formVisitDate}
+                  <span className="font-bold text-white">📅 Data:</span>{' '}
+                  {formVisitDate}
                 </p>
                 {perPersonCost && (
                   <p>
-                    <span className="font-bold text-white">💸 Gasto:</span> R$ {perPersonCost}/pessoa
+                    <span className="font-bold text-white">💸 Gasto:</span> R${' '}
+                    {perPersonCost}/pessoa
                   </p>
                 )}
                 <p>
-                  <span className="font-bold text-white">🌶️ Nota Geral:</span> {formOverallScore}/5
+                  <span className="font-bold text-white">🌶️ Nota Geral:</span>{' '}
+                  {formOverallScore}/5
                 </p>
                 {formComment && (
                   <p>
-                    <span className="font-bold text-white">💬 Mural:</span> "{formComment}"
+                    <span className="font-bold text-white">💬 Mural:</span> "
+                    {formComment}"
                   </p>
                 )}
                 {photos.length > 0 && (
                   <p>
-                    <span className="font-bold text-white">📸 Fotos:</span> {photos.length}
+                    <span className="font-bold text-white">📸 Fotos:</span>{' '}
+                    {photos.length}
                   </p>
                 )}
               </div>
 
               {/* Group validation status list */}
               <div className="space-y-2">
-                <h4 className="text-[10px] font-bold text-[#808080] uppercase tracking-wider">Tropas Destinatárias</h4>
+                <h4 className="text-[10px] font-bold uppercase tracking-wider text-[#808080]">
+                  Tropas Destinatárias
+                </h4>
                 <div className="space-y-1.5">
-                  <div className="flex justify-between items-center bg-[#242424] px-3 py-2 rounded-lg text-xs">
+                  <div className="flex items-center justify-between rounded-lg bg-[#242424] px-3 py-2 text-xs">
                     <span className="text-white">👤 Meu Perfil</span>
-                    <span className="text-[9px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 px-2 py-0.5 rounded font-black uppercase">
+                    <span className="rounded border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[9px] font-black uppercase text-emerald-500">
                       OK
                     </span>
                   </div>
@@ -847,14 +1052,17 @@ export function ReviewFlowScreen() {
                       return rating !== undefined && rating > 0
                     })
                     return (
-                      <div key={group.id} className="flex justify-between items-center bg-[#242424] px-3 py-2 rounded-lg text-xs">
+                      <div
+                        key={group.id}
+                        className="flex items-center justify-between rounded-lg bg-[#242424] px-3 py-2 text-xs"
+                      >
                         <span className="text-white">👥 {group.name}</span>
                         {isSatisfied ? (
-                          <span className="text-[9px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 px-2 py-0.5 rounded font-black uppercase">
+                          <span className="rounded border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[9px] font-black uppercase text-emerald-500">
                             OK
                           </span>
                         ) : (
-                          <span className="text-[9px] bg-red-500/10 border border-red-500/20 text-red-500 px-2 py-0.5 rounded font-black uppercase flex items-center gap-1">
+                          <span className="flex items-center gap-1 rounded border border-red-500/20 bg-red-500/10 px-2 py-0.5 text-[9px] font-black uppercase text-red-500">
                             <AlertTriangle size={8} /> Sem Métricas
                           </span>
                         )}
@@ -865,10 +1073,18 @@ export function ReviewFlowScreen() {
               </div>
 
               <div className="flex gap-2">
-                <Button type="button" variant="outline" onClick={handleBack} className="flex-1 rounded-full border-[#2D2D2D]">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleBack}
+                  className="flex-1 rounded-full border-[#2D2D2D]"
+                >
                   Voltar
                 </Button>
-                <Button type="submit" className="flex-1 rounded-full bg-gradient-to-tr from-primary to-[#FF8C61] font-bold">
+                <Button
+                  type="submit"
+                  className="flex-1 rounded-full bg-gradient-to-tr from-primary to-[#FF8C61] font-bold"
+                >
                   {copy.cta.publish}
                 </Button>
               </div>
@@ -878,21 +1094,28 @@ export function ReviewFlowScreen() {
       </form>
 
       {/* ELO Duel Trigger Modal */}
-      <Dialog isOpen={showDuelDialog} onClose={() => navigate('/')} title="Bora um Duelo? 🥊">
-        <div className="text-center p-2 space-y-4">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary border border-primary/20">
+      <Dialog
+        isOpen={showDuelDialog}
+        onClose={() => navigate('/')}
+        title="Bora um Duelo? 🥊"
+      >
+        <div className="space-y-4 p-2 text-center">
+          <div className="bg-primary/10 border-primary/20 mx-auto flex h-12 w-12 items-center justify-center rounded-full border text-primary">
             <Trophy size={22} />
           </div>
-          <p className="text-xs text-[#A0A0A0] leading-relaxed">
-            Você avaliou dois picos da culinária <span className="font-bold text-primary">{duelDetails?.cuisine}</span> recentemente. 
-            Decida quem é o verdadeiro campeão agora mesmo!
+          <p className="text-xs leading-relaxed text-[#A0A0A0]">
+            Você avaliou dois picos da culinária{' '}
+            <span className="font-bold text-primary">
+              {duelDetails?.cuisine}
+            </span>{' '}
+            recentemente. Decida quem é o verdadeiro campeão agora mesmo!
           </p>
 
           <div className="flex flex-col gap-2 pt-2">
             <Button
               type="button"
               onClick={() => navigate('/duel')}
-              className="w-full rounded-full bg-gradient-to-tr from-primary to-[#FF8C61] font-bold text-xs"
+              className="w-full rounded-full bg-gradient-to-tr from-primary to-[#FF8C61] text-xs font-bold"
             >
               🥊 Entrar no Duelo
             </Button>

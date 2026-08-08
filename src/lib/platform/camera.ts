@@ -44,22 +44,38 @@ async function pickNative(source: Source): Promise<string | null> {
 function pickWeb(useCamera: boolean): Promise<string | null> {
   return new Promise<string | null>((resolve) => {
     const input = document.createElement('input')
+    let settled = false
+    const finish = (value: string | null) => {
+      if (settled) return
+      settled = true
+      input.remove()
+      resolve(value)
+    }
+
     input.type = 'file'
+    // `image/*` lets mobile browsers expose all installed photo providers,
+    // including Google Fotos, instead of restricting the chooser to a custom
+    // file extension.
     input.accept = 'image/*'
     if (useCamera) input.setAttribute('capture', 'environment')
     input.onchange = () => {
       const file = input.files?.[0]
       if (!file) {
-        resolve(null)
+        finish(null)
         return
       }
       const reader = new FileReader()
       reader.onload = () =>
-        resolve(typeof reader.result === 'string' ? reader.result : null)
-      reader.onerror = () => resolve(null)
+        finish(typeof reader.result === 'string' ? reader.result : null)
+      reader.onerror = () => finish(null)
       reader.readAsDataURL(file)
     }
-    input.click()
+    input.oncancel = () => finish(null)
+    try {
+      input.click()
+    } catch {
+      finish(null)
+    }
   })
 }
 

@@ -27,7 +27,9 @@ export function GroupDetailScreen() {
   const leaveGroupMutation = useLeaveGroup()
 
   // Tab State: 'FEED' | 'RANKING' | 'MEMBERS' | 'POLLS'
-  const [activeTab, setActiveTab] = useState<'FEED' | 'RANKING' | 'MEMBERS' | 'POLLS'>('FEED')
+  const [activeTab, setActiveTab] = useState<
+    'FEED' | 'RANKING' | 'MEMBERS' | 'POLLS'
+  >('FEED')
 
   // Interactive Polls State
   const [polls, setPolls] = useState<Poll[]>([])
@@ -78,12 +80,16 @@ export function GroupDetailScreen() {
   }, [group])
 
   if (loadingGroup) {
-    return <div className="text-center py-10 text-xs text-[#808080]">Carregando tropa…</div>
+    return (
+      <div className="py-10 text-center text-xs text-[#808080]">
+        Carregando tropa…
+      </div>
+    )
   }
 
   if (!group) {
     return (
-      <div className="text-center py-10 text-xs text-red-400 font-bold">
+      <div className="py-10 text-center text-xs font-bold text-red-400">
         Tropa não encontrada.
       </div>
     )
@@ -94,40 +100,31 @@ export function GroupDetailScreen() {
   // 1. Group reviews
   const groupReviews =
     reviews?.filter((r) =>
-      r.targetDestinations.some((dest) => dest.type === 'group' && dest.id === group.id)
+      r.targetDestinations.some(
+        (dest) => dest.type === 'group' && dest.id === group.id
+      )
     ) || []
 
   // 2. Group internal ranking calculation
   const ranked = restaurants
-    ? calculateRestaurantRanking(restaurants, groupReviews, null, new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+    ? calculateRestaurantRanking(
+        restaurants,
+        groupReviews,
+        null,
+        new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+      )
     : []
 
   // Handle Joining
   const handleJoin = () => {
     if (!currentUser) return
-    joinGroupMutation.mutate(
-      { groupId: group.id, userId: currentUser.id },
-      {
-        onSuccess: () => {
-          // Trigger local cache sync
-          window.location.reload()
-        },
-      }
-    )
+    joinGroupMutation.mutate({ groupId: group.id, userId: currentUser.id })
   }
 
   // Handle Leaving
   const handleLeave = () => {
     if (!currentUser) return
-    leaveGroupMutation.mutate(
-      { groupId: group.id, userId: currentUser.id },
-      {
-        onSuccess: () => {
-          // Trigger local cache sync
-          window.location.reload()
-        },
-      }
-    )
+    leaveGroupMutation.mutate({ groupId: group.id, userId: currentUser.id })
   }
 
   // Handle Poll voting
@@ -155,7 +152,10 @@ export function GroupDetailScreen() {
               : {
                   ...opt,
                   votes: opt.votes.filter((id) => id !== currentUser.id),
-                  voteCount: Math.max(0, opt.voteCount - (opt.votes.includes(currentUser.id) ? 1 : 0)),
+                  voteCount: Math.max(
+                    0,
+                    opt.voteCount - (opt.votes.includes(currentUser.id) ? 1 : 0)
+                  ),
                 }
           }
 
@@ -202,30 +202,36 @@ export function GroupDetailScreen() {
   }
 
   return (
-    <div className="space-y-5 max-w-md mx-auto pb-10">
+    <div className="mx-auto max-w-md space-y-5 pb-10">
       {/* Cover Image Header */}
-      <div className="relative h-36 w-full rounded-2xl overflow-hidden border border-[#2D2D2D]">
+      <div className="relative h-36 w-full overflow-hidden rounded-2xl border border-[#2D2D2D]">
         {group.coverUrl ? (
-          <img src={group.coverUrl} alt={group.name} className="w-full h-full object-cover" />
+          <img
+            src={group.coverUrl}
+            alt={group.name}
+            className="h-full w-full object-cover"
+          />
         ) : (
-          <div className="w-full h-full bg-gradient-to-tr from-primary/20 to-secondary/20 flex items-center justify-center">
+          <div className="from-primary/20 to-secondary/20 flex h-full w-full items-center justify-center bg-gradient-to-tr">
             <Users size={36} className="text-primary/40" />
           </div>
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
         <div className="absolute bottom-4 left-4 right-4 flex items-end justify-between">
           <div>
-            <h1 className="text-xl font-extrabold text-white flex items-center gap-1.5">
+            <h1 className="flex items-center gap-1.5 text-xl font-extrabold text-white">
               <span>👥 {group.name}</span>
             </h1>
-            <p className="text-[10px] text-[#A0A0A0] mt-0.5">{group.description}</p>
+            <p className="mt-0.5 text-[10px] text-[#A0A0A0]">
+              {group.description}
+            </p>
           </div>
           {isUserMember ? (
             <Button
               size="xs"
               variant="outline"
               onClick={handleLeave}
-              className="text-[9px] border-red-500/20 text-red-500 hover:bg-red-500/10 font-bold rounded-full py-1 h-auto"
+              className="h-auto rounded-full border-red-500/20 py-1 text-[9px] font-bold text-red-500 hover:bg-red-500/10"
             >
               Sair da Tropa
             </Button>
@@ -233,7 +239,7 @@ export function GroupDetailScreen() {
             <Button
               size="xs"
               onClick={handleJoin}
-              className="text-[9px] font-bold rounded-full py-1 h-auto"
+              className="h-auto rounded-full py-1 text-[9px] font-bold"
             >
               Participar
             </Button>
@@ -243,36 +249,48 @@ export function GroupDetailScreen() {
 
       {/* Stats Cards Row */}
       <div className="grid grid-cols-4 gap-2 text-center text-xs">
-        <div className="p-2 bg-[#1A1A1A] border border-[#2D2D2D] rounded-xl">
-          <p className="text-base font-black text-primary">{group.memberCount}</p>
-          <p className="text-[9px] text-[#808080] font-semibold uppercase tracking-wider">Crias</p>
+        <div className="rounded-xl border border-[#2D2D2D] bg-[#1A1A1A] p-2">
+          <p className="text-base font-black text-primary">
+            {group.memberCount}
+          </p>
+          <p className="text-[9px] font-semibold uppercase tracking-wider text-[#808080]">
+            Crias
+          </p>
         </div>
-        <div className="p-2 bg-[#1A1A1A] border border-[#2D2D2D] rounded-xl">
-          <p className="text-base font-black text-primary">{groupReviews.length}</p>
-          <p className="text-[9px] text-[#808080] font-semibold uppercase tracking-wider">Reviews</p>
+        <div className="rounded-xl border border-[#2D2D2D] bg-[#1A1A1A] p-2">
+          <p className="text-base font-black text-primary">
+            {groupReviews.length}
+          </p>
+          <p className="text-[9px] font-semibold uppercase tracking-wider text-[#808080]">
+            Reviews
+          </p>
         </div>
-        <div className="p-2 bg-[#1A1A1A] border border-[#2D2D2D] rounded-xl">
+        <div className="rounded-xl border border-[#2D2D2D] bg-[#1A1A1A] p-2">
           <p className="text-base font-black text-primary">{polls.length}</p>
-          <p className="text-[9px] text-[#808080] font-semibold uppercase tracking-wider">Enquetes</p>
+          <p className="text-[9px] font-semibold uppercase tracking-wider text-[#808080]">
+            Enquetes
+          </p>
         </div>
-        <div className="p-2 bg-[#1A1A1A] border border-[#2D2D2D] rounded-xl">
+        <div className="rounded-xl border border-[#2D2D2D] bg-[#1A1A1A] p-2">
           <p className="text-base font-black text-primary">
             {group.mandatoryMetrics.length}
           </p>
-          <p className="text-[9px] text-[#808080] font-semibold uppercase tracking-wider">Métricas</p>
+          <p className="text-[9px] font-semibold uppercase tracking-wider text-[#808080]">
+            Métricas
+          </p>
         </div>
       </div>
 
       {/* Mandatory Metrics Badges */}
-      <div className="bg-[#1A1A1A] border border-[#2D2D2D] p-3 rounded-xl space-y-1.5">
-        <h4 className="text-[9px] font-bold text-[#808080] uppercase tracking-wider">
+      <div className="space-y-1.5 rounded-xl border border-[#2D2D2D] bg-[#1A1A1A] p-3">
+        <h4 className="text-[9px] font-bold uppercase tracking-wider text-[#808080]">
           Métricas Obrigatórias da Tropa
         </h4>
         <div className="flex flex-wrap gap-1">
           {group.mandatoryMetrics.map((m) => (
             <span
               key={m}
-              className="text-[9px] bg-primary/10 border border-primary/20 text-primary px-2 py-0.5 rounded-full font-bold uppercase tracking-wider"
+              className="bg-primary/10 border-primary/20 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary"
             >
               🎯 {m.toLowerCase().replace('_', ' ')}
             </span>
@@ -281,12 +299,12 @@ export function GroupDetailScreen() {
       </div>
 
       {/* Detail Tabs Bar */}
-      <div className="flex bg-[#1A1A1A] p-1 rounded-xl border border-[#2D2D2D]">
+      <div className="flex rounded-xl border border-[#2D2D2D] bg-[#1A1A1A] p-1">
         <button
           onClick={() => setActiveTab('FEED')}
-          className={`flex-1 py-2 rounded-lg text-[10px] font-extrabold transition-all uppercase tracking-wider ${
+          className={`flex-1 rounded-lg py-2 text-[10px] font-extrabold uppercase tracking-wider transition-all ${
             activeTab === 'FEED'
-              ? 'bg-[#242424] text-white border border-[#2D2D2D]'
+              ? 'border border-[#2D2D2D] bg-[#242424] text-white'
               : 'text-[#808080] hover:text-white'
           }`}
         >
@@ -294,9 +312,9 @@ export function GroupDetailScreen() {
         </button>
         <button
           onClick={() => setActiveTab('RANKING')}
-          className={`flex-1 py-2 rounded-lg text-[10px] font-extrabold transition-all uppercase tracking-wider ${
+          className={`flex-1 rounded-lg py-2 text-[10px] font-extrabold uppercase tracking-wider transition-all ${
             activeTab === 'RANKING'
-              ? 'bg-[#242424] text-white border border-[#2D2D2D]'
+              ? 'border border-[#2D2D2D] bg-[#242424] text-white'
               : 'text-[#808080] hover:text-white'
           }`}
         >
@@ -304,9 +322,9 @@ export function GroupDetailScreen() {
         </button>
         <button
           onClick={() => setActiveTab('MEMBERS')}
-          className={`flex-1 py-2 rounded-lg text-[10px] font-extrabold transition-all uppercase tracking-wider ${
+          className={`flex-1 rounded-lg py-2 text-[10px] font-extrabold uppercase tracking-wider transition-all ${
             activeTab === 'MEMBERS'
-              ? 'bg-[#242424] text-white border border-[#2D2D2D]'
+              ? 'border border-[#2D2D2D] bg-[#242424] text-white'
               : 'text-[#808080] hover:text-white'
           }`}
         >
@@ -314,9 +332,9 @@ export function GroupDetailScreen() {
         </button>
         <button
           onClick={() => setActiveTab('POLLS')}
-          className={`flex-1 py-2 rounded-lg text-[10px] font-extrabold transition-all uppercase tracking-wider ${
+          className={`flex-1 rounded-lg py-2 text-[10px] font-extrabold uppercase tracking-wider transition-all ${
             activeTab === 'POLLS'
-              ? 'bg-[#242424] text-white border border-[#2D2D2D]'
+              ? 'border border-[#2D2D2D] bg-[#242424] text-white'
               : 'text-[#808080] hover:text-white'
           }`}
         >
@@ -330,14 +348,20 @@ export function GroupDetailScreen() {
         {activeTab === 'FEED' && (
           <div className="space-y-4">
             {loadingReviews ? (
-              <div className="text-center py-10 text-xs text-[#808080]">Carregando fofocas…</div>
+              <div className="py-10 text-center text-xs text-[#808080]">
+                Carregando fofocas…
+              </div>
             ) : groupReviews.length > 0 ? (
-              groupReviews.map((review) => <ReviewCard key={review.id} review={review} />)
+              groupReviews.map((review) => (
+                <ReviewCard key={review.id} review={review} />
+              ))
             ) : (
-              <div className="text-center py-12 bg-[#1A1A1A] border border-[#2D2D2D] rounded-2xl">
-                <p className="text-xs text-[#808080] italic">Nenhum post na tropa ainda</p>
+              <div className="rounded-2xl border border-[#2D2D2D] bg-[#1A1A1A] py-12 text-center">
+                <p className="text-xs italic text-[#808080]">
+                  Nenhum post na tropa ainda
+                </p>
                 {isUserMember && (
-                  <Link to="/review" className="block mt-2">
+                  <Link to="/review" className="mt-2 block">
                     <Button size="xs" className="rounded-full text-[10px]">
                       Ser o primeiro a mandar a real 🚀
                     </Button>
@@ -356,9 +380,9 @@ export function GroupDetailScreen() {
                 const r = item.restaurant
                 return (
                   <Link key={r.id} to={`/restaurant/${r.id}`}>
-                    <Card className="border-[#2D2D2D] bg-[#1A1A1A] hover:border-[#444] transition-all p-3 flex items-center justify-between gap-3">
+                    <Card className="flex items-center justify-between gap-3 border-[#2D2D2D] bg-[#1A1A1A] p-3 transition-all hover:border-[#444]">
                       <div className="flex items-center gap-3">
-                        <div className="flex-shrink-0 flex items-center justify-center w-8">
+                        <div className="flex w-8 flex-shrink-0 items-center justify-center">
                           {idx === 0 ? (
                             <span className="text-2xl">🥇</span>
                           ) : idx === 1 ? (
@@ -366,21 +390,25 @@ export function GroupDetailScreen() {
                           ) : idx === 2 ? (
                             <span className="text-2xl">🥉</span>
                           ) : (
-                            <span className="text-sm font-black text-[#808080] bg-[#242424] w-7 h-7 flex items-center justify-center rounded-full">
+                            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#242424] text-sm font-black text-[#808080]">
                               {idx + 1}
                             </span>
                           )}
                         </div>
                         <div>
-                          <h4 className="text-xs font-bold text-white">{r.name}</h4>
+                          <h4 className="text-xs font-bold text-white">
+                            {r.name}
+                          </h4>
                           <p className="text-[10px] text-[#808080]">
                             {r.address.neighborhood} • {r.categories[0]}
                           </p>
                         </div>
                       </div>
                       <div className="text-right">
-                        <span className="text-xs font-black text-primary">🌶️ {item.score.toFixed(1)}</span>
-                        <p className="text-[8px] text-[#808080] uppercase tracking-wider font-bold">
+                        <span className="text-xs font-black text-primary">
+                          🌶️ {item.score.toFixed(1)}
+                        </span>
+                        <p className="text-[8px] font-bold uppercase tracking-wider text-[#808080]">
                           Nota Tropa
                         </p>
                       </div>
@@ -389,8 +417,10 @@ export function GroupDetailScreen() {
                 )
               })
             ) : (
-              <div className="text-center py-12 bg-[#1A1A1A] border border-[#2D2D2D] rounded-2xl">
-                <p className="text-xs text-[#808080] italic">Sem notas suficientes para ranking</p>
+              <div className="rounded-2xl border border-[#2D2D2D] bg-[#1A1A1A] py-12 text-center">
+                <p className="text-xs italic text-[#808080]">
+                  Sem notas suficientes para ranking
+                </p>
               </div>
             )}
           </div>
@@ -398,23 +428,27 @@ export function GroupDetailScreen() {
 
         {/* -------------------- MEMBERS TAB -------------------- */}
         {activeTab === 'MEMBERS' && (
-          <Card className="border-[#2D2D2D] bg-[#1A1A1A] p-4 space-y-3 shadow-md">
-            <h3 className="text-xs font-bold text-white uppercase tracking-wider">Crias Participantes</h3>
+          <Card className="space-y-3 border-[#2D2D2D] bg-[#1A1A1A] p-4 shadow-md">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-white">
+              Crias Participantes
+            </h3>
             <div className="space-y-2">
               {group.members.map((member, idx) => (
                 <div
                   key={idx}
-                  className="flex justify-between items-center bg-[#242424] px-3 py-2.5 rounded-lg border border-[#2D2D2D]"
+                  className="flex items-center justify-between rounded-lg border border-[#2D2D2D] bg-[#242424] px-3 py-2.5"
                 >
                   <div className="flex items-center gap-2">
-                    <div className="h-6 w-6 rounded-full bg-[#1A1A1A] border border-[#2D2D2D] flex items-center justify-center text-[10px] text-white font-bold">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full border border-[#2D2D2D] bg-[#1A1A1A] text-[10px] font-bold text-white">
                       👤
                     </div>
                     <span className="text-xs font-bold text-white">
-                      {member.userId === currentUser?.id ? 'Você' : `@user_${member.userId.slice(2, 6)}`}
+                      {member.userId === currentUser?.id
+                        ? 'Você'
+                        : `@user_${member.userId.slice(2, 6)}`}
                     </span>
                   </div>
-                  <span className="text-[9px] uppercase font-black tracking-widest text-[#808080]">
+                  <span className="text-[9px] font-black uppercase tracking-widest text-[#808080]">
                     {group.adminId === member.userId ? 'Líder 👑' : 'Cria 🤝'}
                   </span>
                 </div>
@@ -430,7 +464,7 @@ export function GroupDetailScreen() {
             {isUserMember && (
               <Button
                 onClick={() => setIsPollSheetOpen(true)}
-                className="w-full rounded-xl bg-gradient-to-tr from-[#242424] to-[#2D2D2D] hover:from-primary hover:to-[#FF8C61] border border-[#2D2D2D] text-white text-xs font-bold py-3 flex items-center justify-center gap-1.5 transition-all duration-300"
+                className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-[#2D2D2D] bg-gradient-to-tr from-[#242424] to-[#2D2D2D] py-3 text-xs font-bold text-white transition-all duration-300 hover:from-primary hover:to-[#FF8C61]"
               >
                 <Plus size={14} />
                 <span>Nova Enquete da Tropa</span>
@@ -440,18 +474,26 @@ export function GroupDetailScreen() {
             {/* Polls list */}
             {polls.length > 0 ? (
               polls.map((poll) => {
-                const totalVotes = poll.options.reduce((sum, opt) => sum + opt.voteCount, 0)
+                const totalVotes = poll.options.reduce(
+                  (sum, opt) => sum + opt.voteCount,
+                  0
+                )
                 const hasVotedAny = poll.options.some((opt) =>
                   currentUser ? opt.votes.includes(currentUser.id) : false
                 )
 
                 return (
-                  <Card key={poll.id} className="border-[#2D2D2D] bg-[#1A1A1A] p-4 space-y-3">
+                  <Card
+                    key={poll.id}
+                    className="space-y-3 border-[#2D2D2D] bg-[#1A1A1A] p-4"
+                  >
                     <div>
-                      <span className="text-[9px] bg-secondary/10 text-secondary border border-secondary/20 px-2 py-0.5 rounded font-black uppercase tracking-wider flex items-center gap-0.5 w-max">
+                      <span className="bg-secondary/10 border-secondary/20 flex w-max items-center gap-0.5 rounded border px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-secondary">
                         <Vote size={9} /> Votação Ativa
                       </span>
-                      <h4 className="text-xs font-bold text-white mt-1.5">{poll.question}</h4>
+                      <h4 className="mt-1.5 text-xs font-bold text-white">
+                        {poll.question}
+                      </h4>
                     </div>
 
                     <div className="space-y-2">
@@ -459,14 +501,17 @@ export function GroupDetailScreen() {
                         const isSelected = currentUser
                           ? opt.votes.includes(currentUser.id)
                           : false
-                        const pct = totalVotes > 0 ? Math.round((opt.voteCount / totalVotes) * 100) : 0
+                        const pct =
+                          totalVotes > 0
+                            ? Math.round((opt.voteCount / totalVotes) * 100)
+                            : 0
 
                         return (
                           <button
                             key={opt.id}
                             disabled={!isUserMember}
                             onClick={() => handleVote(poll.id, opt.id)}
-                            className={`w-full text-left rounded-lg p-2.5 border text-xs font-bold relative overflow-hidden transition-all duration-300 flex items-center justify-between ${
+                            className={`relative flex w-full items-center justify-between overflow-hidden rounded-lg border p-2.5 text-left text-xs font-bold transition-all duration-300 ${
                               isSelected
                                 ? 'border-primary text-white'
                                 : 'border-[#2D2D2D] text-[#A0A0A0] hover:text-white'
@@ -475,13 +520,18 @@ export function GroupDetailScreen() {
                             {/* Vote Percentage Visual Fill */}
                             {hasVotedAny && (
                               <div
-                                className="absolute inset-y-0 left-0 bg-primary/5 transition-all duration-500"
+                                className="bg-primary/5 absolute inset-y-0 left-0 transition-all duration-500"
                                 style={{ width: `${pct}%` }}
                               />
                             )}
 
                             <span className="relative z-10 flex items-center gap-2">
-                              {isSelected && <Check size={12} className="text-primary shrink-0" />}
+                              {isSelected && (
+                                <Check
+                                  size={12}
+                                  className="shrink-0 text-primary"
+                                />
+                              )}
                               <span className="truncate">{opt.text}</span>
                             </span>
 
@@ -495,7 +545,7 @@ export function GroupDetailScreen() {
                       })}
                     </div>
 
-                    <div className="flex justify-between items-center text-[9px] text-[#808080] pt-1">
+                    <div className="flex items-center justify-between pt-1 text-[9px] text-[#808080]">
                       <span>Total de votos: {totalVotes}</span>
                       <span>Encerra em breve</span>
                     </div>
@@ -503,8 +553,10 @@ export function GroupDetailScreen() {
                 )
               })
             ) : (
-              <div className="text-center py-12 bg-[#1A1A1A] border border-[#2D2D2D] rounded-2xl">
-                <p className="text-xs text-[#808080] italic">Nenhuma enquete ativa na tropa</p>
+              <div className="rounded-2xl border border-[#2D2D2D] bg-[#1A1A1A] py-12 text-center">
+                <p className="text-xs italic text-[#808080]">
+                  Nenhuma enquete ativa na tropa
+                </p>
               </div>
             )}
           </div>
@@ -512,11 +564,15 @@ export function GroupDetailScreen() {
       </div>
 
       {/* New Poll Drawer */}
-      <Sheet isOpen={isPollSheetOpen} onClose={() => setIsPollSheetOpen(false)} title="Nova Enquete">
+      <Sheet
+        isOpen={isPollSheetOpen}
+        onClose={() => setIsPollSheetOpen(false)}
+        title="Nova Enquete"
+      >
         <div className="space-y-4 pb-8">
           {/* Question */}
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider">
+            <label className="text-[10px] font-bold uppercase tracking-wider text-[#A0A0A0]">
               Qual a pergunta do bonde?
             </label>
             <input
@@ -524,21 +580,21 @@ export function GroupDetailScreen() {
               placeholder="Ex: Onde vamos amassar hoje?"
               value={pollQuestion}
               onChange={(e) => setPollQuestion(e.target.value)}
-              className="w-full bg-[#242424] border border-[#2D2D2D] rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-primary font-bold"
+              className="w-full rounded-xl border border-[#2D2D2D] bg-[#242424] px-3 py-2 text-xs font-bold text-white outline-none focus:border-primary"
             />
           </div>
 
           {/* Options */}
           <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <label className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-[#A0A0A0]">
                 Opções da Votação
               </label>
               {pollOptionsText.length < 6 && (
                 <button
                   type="button"
                   onClick={handleAddOptionField}
-                  className="text-[10px] text-primary hover:underline font-bold"
+                  className="text-[10px] font-bold text-primary hover:underline"
                 >
                   + Add Opção
                 </button>
@@ -556,7 +612,7 @@ export function GroupDetailScreen() {
                     nextOpts[idx] = e.target.value
                     setPollOptionsText(nextOpts)
                   }}
-                  className="w-full bg-[#242424] border border-[#2D2D2D] rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-primary"
+                  className="w-full rounded-xl border border-[#2D2D2D] bg-[#242424] px-3 py-2 text-xs text-white outline-none focus:border-primary"
                 />
               ))}
             </div>
@@ -565,8 +621,11 @@ export function GroupDetailScreen() {
           {/* Create CTA */}
           <Button
             onClick={handleCreatePoll}
-            disabled={!pollQuestion.trim() || pollOptionsText.filter(t => t.trim() !== '').length < 2}
-            className="w-full rounded-full font-bold py-3 mt-2"
+            disabled={
+              !pollQuestion.trim() ||
+              pollOptionsText.filter((t) => t.trim() !== '').length < 2
+            }
+            className="mt-2 w-full rounded-full py-3 font-bold"
           >
             Lançar Enquete 🚀
           </Button>

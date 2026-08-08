@@ -62,9 +62,12 @@ let vibeChecksState = [...initialVibeChecks]
 let notificationsState = [...initialNotifications]
 
 // New Features In-Memory States
-const hoursFromNow = (h: number) => new Date(Date.now() + h * 60 * 60 * 1000).toISOString()
-const hoursAgo = (h: number) => new Date(Date.now() - h * 60 * 60 * 1000).toISOString()
-const daysAgoIso = (d: number) => new Date(Date.now() - d * 24 * 60 * 60 * 1000).toISOString()
+const hoursFromNow = (h: number) =>
+  new Date(Date.now() + h * 60 * 60 * 1000).toISOString()
+const hoursAgo = (h: number) =>
+  new Date(Date.now() - h * 60 * 60 * 1000).toISOString()
+const daysAgoIso = (d: number) =>
+  new Date(Date.now() - d * 24 * 60 * 60 * 1000).toISOString()
 
 let storiesState: Story[] = [
   {
@@ -322,6 +325,23 @@ export class MockReviewRepository implements ReviewRepository {
 
     return newReview
   }
+  async deleteReview(reviewId: string, userId: string): Promise<void> {
+    const review = reviewsState.find((r) => r.id === reviewId)
+    if (!review) return
+    if (review.userId !== userId) throw new Error('NOT_AUTHORIZED')
+
+    reviewsState = reviewsState.filter((r) => r.id !== reviewId)
+    restaurantsState = restaurantsState.map((r) =>
+      r.id === review.restaurantId
+        ? { ...r, reviewCount: Math.max(0, r.reviewCount - 1) }
+        : r
+    )
+    usersState = usersState.map((u) =>
+      u.id === review.userId
+        ? { ...u, reviewCount: Math.max(0, u.reviewCount - 1) }
+        : u
+    )
+  }
   async toggleLike(reviewId: string, _userId: string): Promise<boolean> {
     let liked = false
     reviewsState = reviewsState.map((r) => {
@@ -574,7 +594,17 @@ export class MockStoryRepository implements StoryRepository {
   async getStories(): Promise<Story[]> {
     // Filter out expired stories
     const nowIso = new Date().toISOString()
-    return storiesState.filter((s) => s.expiresAt > nowIso)
+    return storiesState
+      .filter((s) => s.expiresAt > nowIso)
+      .map((story) => ({
+        ...story,
+        user: usersState.find((user) => user.id === story.userId),
+        restaurant: story.restaurantId
+          ? restaurantsState.find(
+              (restaurant) => restaurant.id === story.restaurantId
+            )
+          : undefined,
+      }))
   }
   async postStory(
     userId: string,
@@ -596,7 +626,10 @@ export class MockStoryRepository implements StoryRepository {
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24h expiry
     }
     storiesState = [newStory, ...storiesState]
-    return newStory
+    return {
+      ...newStory,
+      user: usersState.find((user) => user.id === userId),
+    }
   }
   async markStoryAsViewed(storyId: string, userId: string): Promise<void> {
     storiesState = storiesState.map((s) => {
