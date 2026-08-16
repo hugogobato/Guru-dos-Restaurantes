@@ -54,3 +54,6 @@ desktop.ini
 # Alternate Data Streams (Windows)
 *:Zone.Identifier
 *.Identifier
+
+docs/
+AGENTS.md
